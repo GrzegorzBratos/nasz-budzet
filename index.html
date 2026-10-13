@@ -7,7 +7,14 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; frame-src https://accounts.google.com/gsi/; connect-src https://script.google.com https://script.googleusercontent.com https://accounts.google.com/gsi/; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; img-src 'self' data: https://*.googleusercontent.com; base-uri 'none'; form-action 'none'; object-src 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="robots" content="noindex, nofollow">
-  <meta name="theme-color" content="#F2F2F7">
+  <meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Budżet">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <title>Nasz budżet</title>
   <link rel="stylesheet" href="style.css">
   <script src="config.js"></script>
@@ -18,7 +25,7 @@
   <main>
     <div>
       <h1>Nasz budżet</h1>
-      <p class="sub">Wersja próbna: logowanie i połączenie z arkuszem</p>
+      <p class="sub">Wersja próbna: logowanie, połączenie z arkuszem i ikona na ekranie głównym</p>
     </div>
 
     <section class="karta" id="logowanie">
@@ -29,6 +36,7 @@
     <section class="karta" id="zalogowany" hidden>
       <div class="wiersz"><span>Zalogowany</span><span id="kto"></span></div>
       <div class="wiersz"><span>Dane z banku z</span><span id="godzina"></span></div>
+      <div class="wiersz"><span>Tryb</span><span id="tryb"></span></div>
       <button id="wyloguj" type="button">Wyloguj</button>
     </section>
 

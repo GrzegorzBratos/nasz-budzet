@@ -65,5 +65,15 @@
     $('#wyloguj').addEventListener('click', wyloguj);
   }
 
-  window.addEventListener('load', start);
+  // Tryb: z ikony na ekranie głównym (pełny ekran) czy w przeglądarce – do sprawdzenia przy próbach.
+  function tryb() {
+    const app = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    return app ? 'aplikacja (ekran główny)' : 'przeglądarka';
+  }
+
+  window.addEventListener('load', () => {
+    $('#tryb').textContent = tryb();
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+    start();
+  });
 })();
