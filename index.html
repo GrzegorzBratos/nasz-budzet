@@ -23,24 +23,23 @@
 </head>
 <body>
   <main>
-    <div>
+    <section id="logowanie">
       <h1>Nasz budżet</h1>
-      <p class="sub">Wersja próbna: logowanie, połączenie z arkuszem i ikona na ekranie głównym</p>
-    </div>
-
-    <section class="karta" id="logowanie">
-      <p class="sub">Zaloguj się kontem Google. Dostęp mają tylko nasze dwa konta.</p>
-      <div id="przycisk"></div>
+      <div class="karta">
+        <p class="sub">Zaloguj się kontem Google. Dostęp mają tylko nasze dwa konta.</p>
+        <div id="przycisk"></div>
+      </div>
     </section>
 
-    <section class="karta" id="zalogowany" hidden>
-      <div class="wiersz"><span>Zalogowany</span><span id="kto"></span></div>
-      <div class="wiersz"><span>Dane z banku z</span><span id="godzina"></span></div>
-      <div class="wiersz"><span>Tryb</span><span id="tryb"></span></div>
-      <button id="wyloguj" type="button">Wyloguj</button>
+    <section id="ekran" hidden>
+      <h1 id="tytul"></h1>
+      <p class="sub" id="podtytul"></p>
+      <div id="tresc"></div>
     </section>
 
     <p id="stan" role="status"></p>
   </main>
+  <div id="sheet"></div>
+  <div id="toast"></div>
 </body>
 </html>
