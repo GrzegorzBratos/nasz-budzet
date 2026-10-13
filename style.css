@@ -69,3 +69,10 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 [hidden] { display: none !important; }
 .pz.c-mint { background: var(--mint-ink); } .pz.c-sky { background: var(--sky-ink); } .pz.c-peach { background: var(--peach-ink); }
 .sec .num { text-transform: none; }
+
+/* szkielet ekranu podczas wczytywania */
+.sk { height: 12px; border-radius: 6px; background: var(--line); margin: 4px 0; }
+.sk-m { width: 35%; height: 9px; opacity: .7; } .sk-k { width: 60px; flex: none; } .sk-v { width: 60%; height: 26px; margin: 8px 0; }
+.sk-ring { width: 110px; height: 110px; border-radius: 50%; border: 12px solid var(--line); background: none; flex: none; margin: 0; }
+@media (prefers-reduced-motion: no-preference) { .sk { animation: puls 1.2s ease-in-out infinite; } @keyframes puls { 50% { opacity: .45; } } }
+button:disabled { opacity: .6; }
