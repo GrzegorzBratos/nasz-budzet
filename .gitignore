@@ -1,0 +1,12 @@
+# W tym repozytorium jest TYLKO kod strony. Żadnych danych – nigdy.
+*.csv
+*.xlsx
+*.xls
+*.json
+*.gs
+*.txt
+*.pdf
+dane/
+materialy/
+Wallet_Token*
+.env*
