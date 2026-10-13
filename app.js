@@ -4,7 +4,7 @@
 (function () {
   'use strict';
   const CFG = window.NB_CONFIG;
-  let bilet = null, dane = null;
+  let bilet = null, dane = null, czekanie = null;
   const $ = s => document.querySelector(s);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const zl = n => (n < 0 ? '−' : '') + Math.abs(Math.round(n)).toLocaleString('pl-PL').replace(/ /g, ' ') + ' zł';
@@ -14,23 +14,32 @@
   function stan(tekst, rodzaj) { const el = $('#stan'); el.textContent = tekst || ''; el.dataset.rodzaj = rodzaj || ''; }
   function toast(t) { const el = $('#toast'); el.innerHTML = '<div class="toast" role="status">' + esc(t) + '</div>'; clearTimeout(toast.h); toast.h = setTimeout(() => el.innerHTML = '', 2000); }
 
-  async function api(akcja) {
-    const r = await fetch(CFG.api, { method: 'POST', body: JSON.stringify({ bilet: bilet, akcja: akcja }), redirect: 'follow' });
+  async function api(akcja, dodatki) {
+    const r = await fetch(CFG.api, { method: 'POST', body: JSON.stringify(Object.assign({ bilet: bilet, akcja: akcja }, dodatki || {})), redirect: 'follow' });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     return r.json();
   }
 
   // ---------- logowanie ----------
-  async function poZalogowaniu(odp) { bilet = odp.credential; await wczytaj(); }
-  async function wczytaj() {
-    stan('Wczytuję dane…');
+  async function poZalogowaniu(odp) { bilet = odp.credential; clearTimeout(czekanie); await wczytaj(); }
+  async function wczytaj(swieze) {
+    if (!dane) szkielet();
     try {
-      const w = await api('ten-miesiac');
+      const w = await api('ten-miesiac', swieze ? { swieze: true } : null);
       if (!w.ok) { if (w.blad === 'brak dostępu') { bilet = null; pokazLogowanie(); stan('To konto nie ma dostępu do naszego budżetu.', 'blad'); } else stan('Nie udało się: ' + w.blad, 'blad'); return; }
       dane = w; $('#logowanie').hidden = true; $('#ekran').hidden = false; stan(''); rysuj();
-    } catch (e) { stan('Brak połączenia z arkuszem. Spróbuj za chwilę.', 'blad'); }
+    } catch (e) { stan('Brak połączenia z arkuszem. Spróbuj za chwilę.', 'blad'); if (dane) rysuj(); }
   }
   function pokazLogowanie() { $('#ekran').hidden = true; $('#logowanie').hidden = false; }
+
+  // Szkielet ekranu – widać go od razu, zanim przyjdą dane (dane nie są trzymane w telefonie, więc nie ma czego pokazać wcześniej).
+  function szkielet() {
+    $('#logowanie').hidden = true; $('#ekran').hidden = false; $('#tytul').textContent = 'Ten miesiąc'; $('#podtytul').textContent = 'Wczytuję dane…';
+    const w = n => '<div class="row"><div class="main"><div class="sk" style="width:' + n + '%"></div><div class="sk sk-m"></div></div><div class="sk sk-k"></div></div>';
+    $('#tresc').innerHTML = '<div class="hero"><div class="sk sk-ring"></div><div style="flex:1"><div class="sk" style="width:70%"></div><div class="sk sk-v"></div><div class="sk" style="width:55%"></div></div></div>' +
+      '<div class="sec"><span>Zmienne – na co poszło</span></div><div class="list">' + w(60) + w(45) + w(70) + w(50) + '</div>' +
+      '<div class="sec"><span>Stałe</span></div><div class="list">' + w(55) + w(65) + w(40) + '</div>';
+  }
   function wyloguj() { bilet = null; dane = null; google.accounts.id.disableAutoSelect(); pokazLogowanie(); stan('Wylogowano.'); }
 
   // ---------- ekran „Ten miesiąc” ----------
@@ -132,7 +141,7 @@
     if (z) { const n = +z.dataset.z; otworz(() => oknoZ(n)); }
     else if (y) { const n = +y.dataset.y; otworz(() => oknoY(n)); }
     else if (x) { const n = +x.dataset.x; otworz(() => oknoX(n)); }
-    else if (e.target.id === 'odswiez') { wczytaj().then(() => dane && toast('Odświeżone')); }
+    else if (e.target.id === 'odswiez') { e.target.disabled = true; e.target.textContent = 'Liczę…'; wczytaj(true).then(() => dane && toast('Odświeżone')); }
     else if (e.target.id === 'wyloguj') wyloguj();
   });
   document.addEventListener('keydown', e => { const r = e.target.closest('[data-z],[data-y],[data-x]'); if (r && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); r.click(); } });
@@ -145,7 +154,10 @@
     if (!window.google || !google.accounts || !google.accounts.id) { stan('Nie wczytało się logowanie Google. Odśwież stronę.', 'blad'); return; }
     google.accounts.id.initialize({ client_id: CFG.clientId, callback: poZalogowaniu, auto_select: true, cancel_on_tap_outside: false, use_fedcm_for_prompt: true });
     google.accounts.id.renderButton($('#przycisk'), { theme: 'outline', size: 'large', shape: 'pill', text: 'signin_with', locale: 'pl' });
-    google.accounts.id.prompt();
+    // Zalogowany wcześniej → od razu szkielet; jeśli Google nie zaloguje sam (pierwszy raz, wylogowanie) – pokazujemy przycisk.
+    szkielet();
+    czekanie = setTimeout(() => { if (!bilet) pokazLogowanie(); }, 5000);
+    google.accounts.id.prompt(n => { if (!bilet && n && ((n.isNotDisplayed && n.isNotDisplayed()) || (n.isSkippedMoment && n.isSkippedMoment()))) { clearTimeout(czekanie); pokazLogowanie(); } });
   }
   window.NB_TEST = { pokaz: w => { dane = w; $('#logowanie').hidden = true; $('#ekran').hidden = false; rysuj(); } };   // tylko do prób na danych przykładowych
   window.addEventListener('load', () => {
