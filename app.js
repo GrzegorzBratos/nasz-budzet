@@ -1,4 +1,4 @@
-// Nasz budżet – v11 (14.10: rata pokryta saldem konta do rat = zapłacona; v10: przepustka na 30 dni – logowanie raz na miesiąc; v9: aplikacja = podsumowanie; jeden blok „Stałe”, szczegóły płatności: tytuł i konto): ekran „Ten miesiąc” – salda na górze, bloki zwinięte, stałe: do zapłacenia / schodzą same,
+// Nasz budżet – v12 (14.10: kwoty z groszami; v11: rata pokryta saldem konta do rat = zapłacona; v10: przepustka na 30 dni – logowanie raz na miesiąc; v9: aplikacja = podsumowanie; jeden blok „Stałe”, szczegóły płatności: tytuł i konto): ekran „Ten miesiąc” – salda na górze, bloki zwinięte, stałe: do zapłacenia / schodzą same,
 // wpływy: stałe / okazjonalne (zwroty nie są wpływem – zmniejszają wydatek w swoim rodzaju).
 // Dane trzymamy wyłącznie w pamięci strony – po zamknięciu znikają. W telefonie zapisujemy TYLKO przepustkę od bramy
 // (losowy klucz, ważny 30 dni, bez żadnych danych; „Wyloguj” ją kasuje także w bramie).
@@ -7,13 +7,15 @@
   'use strict';
   const CFG = window.NB_CONFIG;
   let bilet = null, przepustka = null, dane = null, czekanie = null, googleGotowe = false;
-  const WERSJA = 11;
+  const WERSJA = 12;
   const KLUCZ_PRZEPUSTKI = 'nb_przepustka';
   const otwarte = {};                                   // wszystkie bloki zwinięte na start (G 14.10)
   const wToku = {};                                     // odhaczenia wysłane do bramy, jeszcze bez odpowiedzi: klucz → docelowy stan                                   // które bloki rozwinięte (tylko w pamięci, do zamknięcia aplikacji)
   const $ = s => document.querySelector(s);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const zl = n => (n < 0 ? '−' : '') + Math.abs(Math.round(n)).toLocaleString('pl-PL').replace(/ /g, ' ') + ' zł';
+  // Kwoty z groszami (14.10, G: pełne złote fałszowały obraz). Spacja nierozdzielająca w tysiącach – jak dotąd.
+  const kw = n => Math.abs(Math.round(n * 100) / 100).toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/\s/g, '\u00a0');
+  const zl = n => (n < 0 ? '−' : '') + kw(n) + ' zł';
   const POZ = { 'Podstawa': 'c-mint', 'Wybór': 'c-sky', 'Do przyjrzenia się': 'c-peach' };
   const krotko = r => String(r || '').split(' / ').slice(1).join(' / ') || r;
 
@@ -104,7 +106,7 @@
       <div class="main"><div class="t b">${esc(tytul)}</div><div class="s">${opis}</div></div>
       <span class="num b">${kwota}</span><span class="chev${o ? ' o' : ''}" aria-hidden="true"></span></div>${o ? wiersze : ''}</div>`;
   }
-  const zl2 = (a, b) => Math.abs(Math.round(a)).toLocaleString('pl-PL').replace(/ /g, ' ') + ' / ' + zl(b);   // „zapłacone / razem”
+  const zl2 = (a, b) => kw(a) + ' / ' + zl(b);   // „zapłacone / razem”
   const ile = (n, a, b, c) => n + ' ' + (n === 1 ? a : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20)) ? b : c);
   function kartaSald(S) {
     if (!S) return '';
