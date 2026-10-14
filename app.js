@@ -1,4 +1,4 @@
-// Nasz budżet – v5 (14.10): ekran „Ten miesiąc” – salda na górze, bloki zwinięte, stałe: do zapłacenia / schodzą same,
+// Nasz budżet – v6 (14.10; aplikacja = podsumowanie): ekran „Ten miesiąc” – salda na górze, bloki zwinięte, stałe: do zapłacenia / schodzą same,
 // wpływy: stałe / okazjonalne (zwroty nie są wpływem – zmniejszają wydatek w swoim rodzaju).
 // Bilet logowania i dane trzymamy wyłącznie w pamięci strony – po zamknięciu znikają. Nic nie zapisujemy w telefonie.
 // Wszystkie teksty z banku wstawiamy jako tekst (esc), nigdy jako kod strony.
@@ -83,20 +83,22 @@
   function kartaSald(S) {
     if (!S) return '';
     return `<div class="saldo tap" data-saldo="1" role="button" tabindex="0">
-      <div><div class="l">Na kontach</div><div class="v num">${zl(S.biezace)}</div></div>
+      <div><div class="l">Na kontach</div><div class="v num">${zl(S.naKontach != null ? S.naKontach : S.biezace)}</div></div>
       <div class="r"><div class="l">Oszczędności</div><div class="num">${zl(S.oszczednosci)}</div><div class="l num">razem ${zl(S.razem)}</div></div></div>`;
   }
   function oknoSald() {
-    const S = dane.salda, w = k => `<div class="row"><div class="main"><div class="t">${esc(k.nazwa)}</div><div class="s">${esc(k.typ || '')}${k.skad === 'wyliczone' ? ' · wyliczone z wpływów i wypływów' : ''}</div></div><span class="num">${zl(k.saldo)}</span></div>`;
-    okno('Pieniądze', S.razem, 'na kontach ' + zl(S.biezace) + ' · oszczędności ' + zl(S.oszczednosci),
-      '<div class="list" style="margin-top:12px">' + S.konta.map(w).join('') + '</div>');
+    const S = dane.salda, nk = S.naKontach != null ? S.naKontach : S.biezace;
+    const w = k => `<div class="row"><div class="main"><div class="t">${esc(k.nazwa)}</div></div><span class="num">${zl(k.saldo)}</span></div>`;
+    const sekcja = (g, tytul) => { const L = S.konta.filter(k => (k.grupa || '') === g); return L.length ? `<div class="sec"><span>${tytul}</span></div><div class="list">${L.map(w).join('')}</div>` : ''; };
+    okno('Pieniądze', S.razem, 'na kontach ' + zl(nk) + ' · oszczędności ' + zl(S.oszczednosci),
+      sekcja('na kontach', 'Na kontach') + sekcja('oszczędności', 'Oszczędności') + sekcja('pozostałe', 'Pozostałe – poza sumą'));
   }
   function blokZ(Z) {
     const w = Z.grupy.map((g, i) => `<div class="row tap" data-z="${i}" role="button" tabindex="0">
         <span class="pz ${POZ[g.poz] || ''}"></span>
         <div class="main"><div class="t">${esc(krotko(g.rodz))}</div><div class="s">${esc(g.rodz.split(' / ')[0])} · ${ile(g.tx.length, 'płatność', 'płatności', 'płatności')}</div></div>
         <span class="num">${zl(g.suma)}</span></div>`).join('') || '<div class="row"><div class="main s">Brak wydatków zmiennych.</div></div>';
-    return blok('z', 'Zmienne – na co poszło', ile(Z.grupy.length, 'rodzaj', 'rodzaje', 'rodzajów') + ' · zwroty odjęte', zl(Z.suma), w);
+    return blok('z', 'Zmienne – na co poszło', ile(Z.grupy.length, 'rodzaj', 'rodzaje', 'rodzajów'), zl(Z.suma), w);
   }
   function blokY(Y) {
     const poz = Y.pozycje.map((y, i) => Object.assign({ i: i }, y));
@@ -121,7 +123,7 @@
   }
 
   function lista(tx) {
-    return '<div class="list" style="margin-top:12px">' + tx.map(p => `<div class="row"><div class="main"><div class="t">${esc(p.kontr)}</div><div class="s">${esc(p.d)}${p.k < 0 ? ' · zwrot' : ''}</div></div><span class="num">${zl(p.k)}</span></div>`).join('') + '</div>';
+    return '<div class="list" style="margin-top:12px">' + tx.map(p => `<div class="row"><div class="main"><div class="t">${esc(p.kontr)}</div><div class="s">${esc(p.d)}</div></div><span class="num">${zl(p.k)}</span></div>`).join('') + '</div>';
   }
   function okno(tytul, kwota, pod, srodek) {
     $('#sheet').innerHTML = `<div class="sheet-bg" id="bg"><div class="sheet" role="dialog" aria-label="${esc(tytul)}">
@@ -131,7 +133,7 @@
       <button class="b-ghost big" id="zamknij" type="button">Zamknij</button></div></div>`;
     bindSheet();
   }
-  function oknoZ(i) { const g = dane.Z.grupy[i]; okno(krotko(g.rodz), g.suma, g.rodz.split(' / ')[0] + ' · ' + (g.poz || 'bez poziomu'), lista(g.tx)); }
+  function oknoZ(i) { const g = dane.Z.grupy[i]; okno(krotko(g.rodz), g.suma, g.rodz.split(' / ')[0] + ' · ' + (g.poz || 'bez poziomu') + (g.zwroty > 0 ? ' · po odjęciu zwrotów (' + zl(g.zwroty) + ')' : ''), lista(g.tx)); }
   function oknoX(k) {
     const X = dane.X, G = k[0] === 's' ? (X.stale || { grupy: [] }) : (X.okazjonalne || X), g = G.grupy[+k.slice(1)];
     okno(krotko(g.rodz), g.suma, k[0] === 's' ? 'wpływy stałe w tym miesiącu' : 'wpływy okazjonalne w tym miesiącu', lista(g.tx));
