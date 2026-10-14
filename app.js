@@ -1,4 +1,4 @@
-// Nasz budżet – v6 (14.10; aplikacja = podsumowanie): ekran „Ten miesiąc” – salda na górze, bloki zwinięte, stałe: do zapłacenia / schodzą same,
+// Nasz budżet – v7 (14.10; aplikacja = podsumowanie; blok „Do zrobienia” z odhaczaniem): ekran „Ten miesiąc” – salda na górze, bloki zwinięte, stałe: do zapłacenia / schodzą same,
 // wpływy: stałe / okazjonalne (zwroty nie są wpływem – zmniejszają wydatek w swoim rodzaju).
 // Bilet logowania i dane trzymamy wyłącznie w pamięci strony – po zamknięciu znikają. Nic nie zapisujemy w telefonie.
 // Wszystkie teksty z banku wstawiamy jako tekst (esc), nigdy jako kod strony.
@@ -6,7 +6,8 @@
   'use strict';
   const CFG = window.NB_CONFIG;
   let bilet = null, dane = null, czekanie = null;
-  const otwarte = {};                                   // które bloki rozwinięte (tylko w pamięci, do zamknięcia aplikacji)
+  const WERSJA = 7;
+  const otwarte = { zd: true };                         // „Do zrobienia” rozwinięte na start, reszta zwinięta                                   // które bloki rozwinięte (tylko w pamięci, do zamknięcia aplikacji)
   const $ = s => document.querySelector(s);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const zl = n => (n < 0 ? '−' : '') + Math.abs(Math.round(n)).toLocaleString('pl-PL').replace(/ /g, ' ') + ' zł';
@@ -50,7 +51,7 @@
     const tempo = o.dzien ? Z.suma / o.dzien * o.dni : 0;
     $('#tytul').textContent = o.nazwa.charAt(0).toUpperCase() + o.nazwa.slice(1);
     $('#podtytul').textContent = o.od + ' – ' + o.do + ' · dzień ' + o.dzien + ' z ' + o.dni;
-    $('#tresc').innerHTML = `${kartaSald(d.salda)}
+    $('#tresc').innerHTML = `${kartaSald(d.salda)}${blokZadan(d.zadania)}
       <div class="hero">
         <svg class="ring" viewBox="0 0 110 110" aria-hidden="true">
           <circle cx="55" cy="55" r="46" fill="none" stroke="var(--line)" stroke-width="12"/>
@@ -68,7 +69,7 @@
       ${blokX(X)}
 
       <p class="legend"><span class="chip c-mint">Podstawa</span> <span class="chip c-sky">Wybór</span> <span class="chip c-peach">Do przyjrzenia się</span></p>
-      <div class="stopka"><span>${esc(d.email)} · ${tryb()}</span><button class="b-ghost" id="wyloguj" type="button">Wyloguj</button></div>`;
+      <div class="stopka"><span>${esc(d.email)} · ${tryb()} · wersja ${WERSJA}</span><button class="b-ghost" id="wyloguj" type="button">Wyloguj</button></div>`;
   }
 
   // ---------- bloki (zwinięte na start; dotknięcie nagłówka rozwija) ----------
@@ -93,6 +94,27 @@
     okno('Pieniądze', S.razem, 'na kontach ' + zl(nk) + ' · oszczędności ' + zl(S.oszczednosci),
       sekcja('na kontach', 'Na kontach') + sekcja('oszczędności', 'Oszczędności') + sekcja('pozostałe', 'Pozostałe – poza sumą'));
   }
+  // ---------- „Do zrobienia”: zapłać / przelej; kółko = odhacz (jedyny zapis do arkusza – przez bramę) ----------
+  const STAN = { 'do zrobienia': ['wait', ''], 'odhaczone': ['ok szary', 'odhaczone – czekam na bank'], 'sprawdź': ['uwaga', 'odhaczone, ale z banku nic nie przyszło – sprawdź'], 'potwierdzone': ['ok', 'potwierdzone przez bank'] };
+  function blokZadan(L) {
+    if (!L || !L.length) return '';
+    const czeka = L.filter(z => z.stan === 'do zrobienia' || z.stan === 'sprawdź').length;
+    const w = L.map((z, i) => { const st = STAN[z.stan] || STAN['do zrobienia'];
+      return `<div class="row${z.stan === 'odhaczone' || z.stan === 'potwierdzone' ? ' zrobione' : ''}">
+        <button class="check ${st[0]}" data-odhacz="${i}" type="button" aria-label="${z.stan === 'do zrobienia' ? 'Odhacz jako zrobione' : 'Cofnij odhaczenie'}" ${z.stan === 'potwierdzone' ? 'disabled' : ''}>${z.stan === 'do zrobienia' ? '' : z.stan === 'sprawdź' ? '!' : '✓'}</button>
+        <div class="main"><div class="t">${esc(z.tytul)}</div><div class="s">${z.kwota ? 'ok. ' + zl(z.kwota) + ' · ' : ''}${z.termin ? 'termin ' + esc(z.termin) : ''}${st[1] ? ' · ' + esc(st[1]) : ''}${z.stan === 'potwierdzone' && z.opis ? ' · ' + esc(z.opis) : ''}</div></div></div>`; }).join('');
+    return blok('zd', 'Do zrobienia', czeka ? 'czeka: ' + czeka : 'wszystko odhaczone', '', w);
+  }
+  async function odhacz(i, przycisk) {
+    const z = dane.zadania[i]; if (!z || z.stan === 'potwierdzone') return;
+    przycisk.disabled = true;
+    try {
+      const w = await api('odhacz', { klucz: z.klucz, cofnij: z.stan !== 'do zrobienia' });
+      if (!w.ok) { toast('Nie udało się: ' + (w.blad || 'błąd')); przycisk.disabled = false; return; }
+      dane.zadania = w.zadania; rysuj(); toast(z.stan === 'do zrobienia' ? 'Odhaczone' : 'Cofnięte');
+    } catch (e) { toast('Brak połączenia – spróbuj za chwilę'); przycisk.disabled = false; }
+  }
+
   function blokZ(Z) {
     const w = Z.grupy.map((g, i) => `<div class="row tap" data-z="${i}" role="button" tabindex="0">
         <span class="pz ${POZ[g.poz] || ''}"></span>
@@ -180,8 +202,9 @@
   // ---------- zdarzenia ----------
   document.addEventListener('click', e => {
     const z = e.target.closest('[data-z]'), y = e.target.closest('[data-y]'), x = e.target.closest('[data-x]');
-    const b = e.target.closest('[data-blok]'), sl = e.target.closest('[data-saldo]');
-    if (b) { otwarte[b.dataset.blok] = !otwarte[b.dataset.blok]; rysuj(); }
+    const b = e.target.closest('[data-blok]'), sl = e.target.closest('[data-saldo]'), od = e.target.closest('[data-odhacz]');
+    if (od) odhacz(+od.dataset.odhacz, od);
+    else if (b) { otwarte[b.dataset.blok] = !otwarte[b.dataset.blok]; rysuj(); }
     else if (sl) otworz(() => oknoSald());
     else if (z) { const n = +z.dataset.z; otworz(() => oknoZ(n)); }
     else if (y) { const n = +y.dataset.y; otworz(() => oknoY(n)); }
