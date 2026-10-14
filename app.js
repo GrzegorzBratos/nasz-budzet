@@ -1,4 +1,4 @@
-// Nasz budżet – v12 (14.10: kwoty z groszami; v11: rata pokryta saldem konta do rat = zapłacona; v10: przepustka na 30 dni – logowanie raz na miesiąc; v9: aplikacja = podsumowanie; jeden blok „Stałe”, szczegóły płatności: tytuł i konto): ekran „Ten miesiąc” – salda na górze, bloki zwinięte, stałe: do zapłacenia / schodzą same,
+// Nasz budżet – v13 (14.10: najem na czysto – koszty mieszkania odjęte od najmu, nie ma ich w „Stałe”; v12: kwoty z groszami; v11: rata pokryta saldem konta do rat = zapłacona; v10: przepustka na 30 dni – logowanie raz na miesiąc; v9: aplikacja = podsumowanie; jeden blok „Stałe”, szczegóły płatności: tytuł i konto): ekran „Ten miesiąc” – salda na górze, bloki zwinięte, stałe: do zapłacenia / schodzą same,
 // wpływy: stałe / okazjonalne (zwroty nie są wpływem – zmniejszają wydatek w swoim rodzaju).
 // Dane trzymamy wyłącznie w pamięci strony – po zamknięciu znikają. W telefonie zapisujemy TYLKO przepustkę od bramy
 // (losowy klucz, ważny 30 dni, bez żadnych danych; „Wyloguj” ją kasuje także w bramie).
@@ -7,7 +7,7 @@
   'use strict';
   const CFG = window.NB_CONFIG;
   let bilet = null, przepustka = null, dane = null, czekanie = null, googleGotowe = false;
-  const WERSJA = 12;
+  const WERSJA = 13;
   const KLUCZ_PRZEPUSTKI = 'nb_przepustka';
   const otwarte = {};                                   // wszystkie bloki zwinięte na start (G 14.10)
   const wToku = {};                                     // odhaczenia wysłane do bramy, jeszcze bez odpowiedzi: klucz → docelowy stan                                   // które bloki rozwinięte (tylko w pamięci, do zamknięcia aplikacji)
@@ -177,7 +177,7 @@
   function blokX(X) {
     const st = X.stale || { suma: 0, grupy: [] }, ok = X.okazjonalne || { suma: X.suma, grupy: X.grupy };
     const w = (G, k) => G.grupy.map((g, i) => `<div class="row tap" data-x="${k}${i}" role="button" tabindex="0">
-        <div class="main"><div class="t">${esc(krotko(g.rodz))}</div><div class="s">${ile(g.tx.length, 'wpływ', 'wpływy', 'wpływów')}</div></div>
+        <div class="main"><div class="t">${esc(krotko(g.rodz))}${g.naCzysto ? ' (na czysto)' : ''}</div><div class="s">${g.naCzysto && g.czeka ? 'czeka na przelew najemcy' : g.naCzysto ? 'po odjęciu kosztów mieszkania' : ile(g.tx.length, 'wpływ', 'wpływy', 'wpływów')}</div></div>
         <span class="num">${zl(g.suma)}</span></div>`).join('') || '<div class="row"><div class="main s">Brak.</div></div>';
     return blok('xs', 'Wpływy stałe', st.grupy.length ? ile(st.grupy.length, 'rodzaj', 'rodzaje', 'rodzajów') : 'brak', zl(st.suma), w(st, 's')) +
       blok('xo', 'Wpływy okazjonalne', ok.grupy.length ? ile(ok.grupy.length, 'rodzaj', 'rodzaje', 'rodzajów') : 'brak', zl(ok.suma), w(ok, 'o'));
@@ -197,6 +197,12 @@
   function oknoZ(i) { const g = dane.Z.grupy[i]; okno(krotko(g.rodz), g.suma, g.rodz.split(' / ')[0] + ' · ' + (g.poz || 'bez poziomu') + (g.zwroty > 0 ? ' · po odjęciu zwrotów (' + zl(g.zwroty) + ')' : ''), lista(g.tx)); }
   function oknoX(k) {
     const X = dane.X, G = k[0] === 's' ? (X.stale || { grupy: [] }) : (X.okazjonalne || X), g = G.grupy[+k.slice(1)];
+    if (g.naCzysto) {                                     // najem: przelew najemcy − koszty mieszkania, które zwraca
+      const sek = (t, kw) => `<div class="sec"><span>${t}</span><span class="num">${zl(kw)}</span></div>`;
+      const srodek = sek('Przelew od najemcy', g.wplyw) + (g.tx.length ? lista(g.tx).replace('margin-top:12px', '') : '<div class="list"><div class="row"><div class="main s">Jeszcze nie przyszedł.</div></div></div>') +
+        sek('Koszty mieszkania (odjęte)', g.kosztySuma) + (g.koszty.length ? lista(g.koszty).replace('margin-top:12px', '') : '<div class="list"><div class="row"><div class="main s">Brak w tym miesiącu.</div></div></div>');
+      return okno(krotko(g.rodz) + ' (na czysto)', g.suma, 'wpływ stały · koszty mieszkania zwraca najemca', srodek);
+    }
     okno(krotko(g.rodz), g.suma, k[0] === 's' ? 'wpływy stałe w tym miesiącu' : 'wpływy okazjonalne w tym miesiącu', lista(g.tx));
   }
   function oknoY(i) {
