@@ -1,10 +1,12 @@
-// Nasz budżet – v2: ekran „Ten miesiąc” na prawdziwych danych (fakty, bez planu).
+// Nasz budżet – v5 (14.10): ekran „Ten miesiąc” – salda na górze, bloki zwinięte, stałe: do zapłacenia / schodzą same,
+// wpływy: stałe / okazjonalne (zwroty nie są wpływem – zmniejszają wydatek w swoim rodzaju).
 // Bilet logowania i dane trzymamy wyłącznie w pamięci strony – po zamknięciu znikają. Nic nie zapisujemy w telefonie.
 // Wszystkie teksty z banku wstawiamy jako tekst (esc), nigdy jako kod strony.
 (function () {
   'use strict';
   const CFG = window.NB_CONFIG;
   let bilet = null, dane = null, czekanie = null;
+  const otwarte = {};                                   // które bloki rozwinięte (tylko w pamięci, do zamknięcia aplikacji)
   const $ = s => document.querySelector(s);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const zl = n => (n < 0 ? '−' : '') + Math.abs(Math.round(n)).toLocaleString('pl-PL').replace(/ /g, ' ') + ' zł';
@@ -35,10 +37,9 @@
   // Szkielet ekranu – widać go od razu, zanim przyjdą dane (dane nie są trzymane w telefonie, więc nie ma czego pokazać wcześniej).
   function szkielet() {
     $('#logowanie').hidden = true; $('#ekran').hidden = false; $('#tytul').textContent = 'Ten miesiąc'; $('#podtytul').textContent = 'Wczytuję dane…';
-    const w = n => '<div class="row"><div class="main"><div class="sk" style="width:' + n + '%"></div><div class="sk sk-m"></div></div><div class="sk sk-k"></div></div>';
-    $('#tresc').innerHTML = '<div class="hero"><div class="sk sk-ring"></div><div style="flex:1"><div class="sk" style="width:70%"></div><div class="sk sk-v"></div><div class="sk" style="width:55%"></div></div></div>' +
-      '<div class="sec"><span>Zmienne – na co poszło</span></div><div class="list">' + w(60) + w(45) + w(70) + w(50) + '</div>' +
-      '<div class="sec"><span>Stałe</span></div><div class="list">' + w(55) + w(65) + w(40) + '</div>';
+    const b = n => '<div class="blok"><div class="row"><div class="main"><div class="sk" style="width:' + n + '%"></div><div class="sk sk-m"></div></div><div class="sk sk-k"></div></div></div>';
+    $('#tresc').innerHTML = '<div class="saldo"><div style="flex:1"><div class="sk" style="width:40%"></div><div class="sk sk-v"></div></div></div>' + '<div class="hero"><div class="sk sk-ring"></div><div style="flex:1"><div class="sk" style="width:70%"></div><div class="sk sk-v"></div><div class="sk" style="width:55%"></div></div></div>' +
+      b(60) + b(45) + b(55) + b(40) + b(50);
   }
   function wyloguj() { bilet = null; dane = null; google.accounts.id.disableAutoSelect(); pokazLogowanie(); stan('Wylogowano.'); }
 
@@ -49,7 +50,7 @@
     const tempo = o.dzien ? Z.suma / o.dzien * o.dni : 0;
     $('#tytul').textContent = o.nazwa.charAt(0).toUpperCase() + o.nazwa.slice(1);
     $('#podtytul').textContent = o.od + ' – ' + o.do + ' · dzień ' + o.dzien + ' z ' + o.dni;
-    $('#tresc').innerHTML = `
+    $('#tresc').innerHTML = `${kartaSald(d.salda)}
       <div class="hero">
         <svg class="ring" viewBox="0 0 110 110" aria-hidden="true">
           <circle cx="55" cy="55" r="46" fill="none" stroke="var(--line)" stroke-width="12"/>
@@ -62,29 +63,65 @@
       </div>
       <div class="fresh"><span>Dane z banku: ${esc(d.daneZ || '—')}</span><button class="b-soft" id="odswiez" type="button">Odśwież</button></div>
 
-      <div class="sec"><span>Zmienne – na co poszło</span><span class="num">${zl(Z.suma)}</span></div>
-      <div class="list">${Z.grupy.map((g, i) => `<div class="row tap" data-z="${i}" role="button" tabindex="0">
-        <span class="pz ${POZ[g.poz] || ''}"></span>
-        <div class="main"><div class="t">${esc(krotko(g.rodz))}</div><div class="s">${esc(g.rodz.split(' / ')[0])} · ${g.tx.length} ${g.tx.length === 1 ? 'płatność' : 'płatności'}</div></div>
-        <span class="num">${zl(g.suma)}</span></div>`).join('') || '<div class="row"><div class="main s">Brak wydatków zmiennych.</div></div>'}</div>
-
-      <div class="sec"><span>Stałe</span><span class="num">${zl(Y.zaplacono)} z ${zl(Y.suma)}</span></div>
-      <div class="list">${Y.pozycje.map((y, i) => `<div class="row tap" data-y="${i}" role="button" tabindex="0">
-        <span class="check ${y.zaplacono > 0 ? 'ok' : 'wait'}">${y.zaplacono > 0 ? '✓' : ''}</span>
-        <div class="main"><div class="t">${esc(y.nazwa)}</div><div class="s">${y.zaplacono > 0 ? 'zapłacone ' + esc(y.platnosci[0].d) : 'termin ' + esc(y.termin || '—')} · ${esc(krotko(y.rodz))}</div></div>
-        <span class="num">${zl(y.zaplacono > 0 ? y.zaplacono : y.kwota)}</span></div>`).join('')}</div>
-
-      <div class="sec"><span>Wpływy</span><span class="num">${zl(X.suma)}</span></div>
-      <div class="list">${X.grupy.map((g, i) => `<div class="row tap" data-x="${i}" role="button" tabindex="0">
-        <div class="main"><div class="t">${esc(krotko(g.rodz))}</div><div class="s">${g.tx.length} ${g.tx.length === 1 ? 'wpływ' : 'wpływy'}</div></div>
-        <span class="num">${zl(g.suma)}</span></div>`).join('')}</div>
+      ${blokZ(Z)}
+      ${blokY(Y)}
+      ${blokX(X)}
 
       <p class="legend"><span class="chip c-mint">Podstawa</span> <span class="chip c-sky">Wybór</span> <span class="chip c-peach">Do przyjrzenia się</span></p>
       <div class="stopka"><span>${esc(d.email)} · ${tryb()}</span><button class="b-ghost" id="wyloguj" type="button">Wyloguj</button></div>`;
   }
 
+  // ---------- bloki (zwinięte na start; dotknięcie nagłówka rozwija) ----------
+  function blok(id, tytul, opis, kwota, wiersze) {
+    const o = !!otwarte[id];
+    return `<div class="blok"><div class="row tap glowa" data-blok="${id}" role="button" tabindex="0" aria-expanded="${o}">
+      <div class="main"><div class="t b">${esc(tytul)}</div><div class="s">${opis}</div></div>
+      <span class="num b">${kwota}</span><span class="chev${o ? ' o' : ''}" aria-hidden="true"></span></div>${o ? wiersze : ''}</div>`;
+  }
+  const zl2 = (a, b) => Math.abs(Math.round(a)).toLocaleString('pl-PL').replace(/ /g, ' ') + ' / ' + zl(b);   // „zapłacone / razem”
+  const ile = (n, a, b, c) => n + ' ' + (n === 1 ? a : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20)) ? b : c);
+  function kartaSald(S) {
+    if (!S) return '';
+    return `<div class="saldo tap" data-saldo="1" role="button" tabindex="0">
+      <div><div class="l">Na kontach</div><div class="v num">${zl(S.biezace)}</div></div>
+      <div class="r"><div class="l">Oszczędności</div><div class="num">${zl(S.oszczednosci)}</div><div class="l num">razem ${zl(S.razem)}</div></div></div>`;
+  }
+  function oknoSald() {
+    const S = dane.salda, w = k => `<div class="row"><div class="main"><div class="t">${esc(k.nazwa)}</div><div class="s">${esc(k.typ || '')}${k.skad === 'wyliczone' ? ' · wyliczone z wpływów i wypływów' : ''}</div></div><span class="num">${zl(k.saldo)}</span></div>`;
+    okno('Pieniądze', S.razem, 'na kontach ' + zl(S.biezace) + ' · oszczędności ' + zl(S.oszczednosci),
+      '<div class="list" style="margin-top:12px">' + S.konta.map(w).join('') + '</div>');
+  }
+  function blokZ(Z) {
+    const w = Z.grupy.map((g, i) => `<div class="row tap" data-z="${i}" role="button" tabindex="0">
+        <span class="pz ${POZ[g.poz] || ''}"></span>
+        <div class="main"><div class="t">${esc(krotko(g.rodz))}</div><div class="s">${esc(g.rodz.split(' / ')[0])} · ${ile(g.tx.length, 'płatność', 'płatności', 'płatności')}</div></div>
+        <span class="num">${zl(g.suma)}</span></div>`).join('') || '<div class="row"><div class="main s">Brak wydatków zmiennych.</div></div>';
+    return blok('z', 'Zmienne – na co poszło', ile(Z.grupy.length, 'rodzaj', 'rodzaje', 'rodzajów') + ' · zwroty odjęte', zl(Z.suma), w);
+  }
+  function blokY(Y) {
+    const poz = Y.pozycje.map((y, i) => Object.assign({ i: i }, y));
+    const reczne = poz.filter(y => y.platnosc !== 'automatyczna'), same = poz.filter(y => y.platnosc === 'automatyczna');
+    reczne.sort((a, b) => (a.zaplacono > 0) - (b.zaplacono > 0) || String(a.terminISO || '9').localeCompare(String(b.terminISO || '9')));
+    const w = y => `<div class="row tap" data-y="${y.i}" role="button" tabindex="0">
+        <span class="check ${y.zaplacono > 0 ? 'ok' : 'wait'}">${y.zaplacono > 0 ? '✓' : ''}</span>
+        <div class="main"><div class="t">${esc(y.nazwa)}</div><div class="s">${y.zaplacono > 0 ? 'zapłacone ' + esc(y.platnosci[0].d) : 'termin ' + esc(y.termin || '—')} · ${esc(krotko(y.rodz))}</div></div>
+        <span class="num">${zl(y.zaplacono > 0 ? y.zaplacono : y.kwota)}</span></div>`;
+    const suma = L => L.reduce((s, y) => s + Math.max(y.kwota, y.zaplacono), 0), zap = L => L.reduce((s, y) => s + y.zaplacono, 0);
+    const brak = L => L.filter(y => !(y.zaplacono > 0)).length;
+    return blok('yr', 'Stałe – do zapłacenia', brak(reczne) ? 'do zapłacenia: ' + brak(reczne) + ' z ' + reczne.length : 'wszystko zapłacone', zl2(zap(reczne), suma(reczne)), reczne.map(w).join('') || '<div class="row"><div class="main s">Brak.</div></div>') +
+      blok('ya', 'Stałe – schodzą same', ile(same.length, 'pozycja', 'pozycje', 'pozycji') + (brak(same) ? ' · jeszcze nie zeszło: ' + brak(same) : ''), zl2(zap(same), suma(same)), same.map(w).join('') || '<div class="row"><div class="main s">Brak.</div></div>');
+  }
+  function blokX(X) {
+    const st = X.stale || { suma: 0, grupy: [] }, ok = X.okazjonalne || { suma: X.suma, grupy: X.grupy };
+    const w = (G, k) => G.grupy.map((g, i) => `<div class="row tap" data-x="${k}${i}" role="button" tabindex="0">
+        <div class="main"><div class="t">${esc(krotko(g.rodz))}</div><div class="s">${ile(g.tx.length, 'wpływ', 'wpływy', 'wpływów')}</div></div>
+        <span class="num">${zl(g.suma)}</span></div>`).join('') || '<div class="row"><div class="main s">Brak.</div></div>';
+    return blok('xs', 'Wpływy stałe', st.grupy.length ? ile(st.grupy.length, 'rodzaj', 'rodzaje', 'rodzajów') : 'brak', zl(st.suma), w(st, 's')) +
+      blok('xo', 'Wpływy okazjonalne', ok.grupy.length ? ile(ok.grupy.length, 'rodzaj', 'rodzaje', 'rodzajów') : 'brak', zl(ok.suma), w(ok, 'o'));
+  }
+
   function lista(tx) {
-    return '<div class="list" style="margin-top:12px">' + tx.map(p => `<div class="row"><div class="main"><div class="t">${esc(p.kontr)}</div><div class="s">${esc(p.d)}</div></div><span class="num">${zl(p.k)}</span></div>`).join('') + '</div>';
+    return '<div class="list" style="margin-top:12px">' + tx.map(p => `<div class="row"><div class="main"><div class="t">${esc(p.kontr)}</div><div class="s">${esc(p.d)}${p.k < 0 ? ' · zwrot' : ''}</div></div><span class="num">${zl(p.k)}</span></div>`).join('') + '</div>';
   }
   function okno(tytul, kwota, pod, srodek) {
     $('#sheet').innerHTML = `<div class="sheet-bg" id="bg"><div class="sheet" role="dialog" aria-label="${esc(tytul)}">
@@ -95,7 +132,10 @@
     bindSheet();
   }
   function oknoZ(i) { const g = dane.Z.grupy[i]; okno(krotko(g.rodz), g.suma, g.rodz.split(' / ')[0] + ' · ' + (g.poz || 'bez poziomu'), lista(g.tx)); }
-  function oknoX(i) { const g = dane.X.grupy[i]; okno(krotko(g.rodz), g.suma, 'wpływy w tym miesiącu', lista(g.tx)); }
+  function oknoX(k) {
+    const X = dane.X, G = k[0] === 's' ? (X.stale || { grupy: [] }) : (X.okazjonalne || X), g = G.grupy[+k.slice(1)];
+    okno(krotko(g.rodz), g.suma, k[0] === 's' ? 'wpływy stałe w tym miesiącu' : 'wpływy okazjonalne w tym miesiącu', lista(g.tx));
+  }
   function oknoY(i) {
     const y = dane.Y.pozycje[i];
     const srodek = y.platnosci.length ? '<div class="sec"><span>Rozliczone płatnością z banku</span></div>' + lista(y.platnosci).replace('margin-top:12px', '')
@@ -138,13 +178,16 @@
   // ---------- zdarzenia ----------
   document.addEventListener('click', e => {
     const z = e.target.closest('[data-z]'), y = e.target.closest('[data-y]'), x = e.target.closest('[data-x]');
-    if (z) { const n = +z.dataset.z; otworz(() => oknoZ(n)); }
+    const b = e.target.closest('[data-blok]'), sl = e.target.closest('[data-saldo]');
+    if (b) { otwarte[b.dataset.blok] = !otwarte[b.dataset.blok]; rysuj(); }
+    else if (sl) otworz(() => oknoSald());
+    else if (z) { const n = +z.dataset.z; otworz(() => oknoZ(n)); }
     else if (y) { const n = +y.dataset.y; otworz(() => oknoY(n)); }
-    else if (x) { const n = +x.dataset.x; otworz(() => oknoX(n)); }
+    else if (x) { const n = x.dataset.x; otworz(() => oknoX(n)); }
     else if (e.target.id === 'odswiez') { e.target.disabled = true; e.target.textContent = 'Liczę…'; wczytaj(true).then(() => dane && toast('Odświeżone')); }
     else if (e.target.id === 'wyloguj') wyloguj();
   });
-  document.addEventListener('keydown', e => { const r = e.target.closest('[data-z],[data-y],[data-x]'); if (r && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); r.click(); } });
+  document.addEventListener('keydown', e => { const r = e.target.closest('[data-z],[data-y],[data-x],[data-blok],[data-saldo]'); if (r && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); r.click(); } });
 
   function tryb() {
     const app = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
