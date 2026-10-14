@@ -93,3 +93,10 @@ button.check.wait { border: 1.5px solid var(--muted); }
 .check.uwaga { background: var(--rose); color: var(--rose-ink); }
 .row.zrobione .t { color: var(--muted); }
 .blok + .hero { margin-top: 12px; }
+/* 14.10 (2): kolor „Do zrobienia”, pulsowanie kółka podczas zapisu */
+.blok.czeka .glowa { background: var(--rose); } .blok.czeka .glowa .b, .blok.czeka .glowa .s { color: var(--rose-ink); }
+.blok.gotowe .glowa { background: var(--mint); } .blok.gotowe .glowa .b, .blok.gotowe .glowa .s { color: var(--mint-ink); }
+.blok.czeka .chev { border-color: var(--rose-ink); } .blok.gotowe .chev { border-color: var(--mint-ink); }
+.check.trwa { animation: trwa .8s ease-in-out infinite; }
+@keyframes trwa { 50% { transform: scale(.82); opacity: .55; } }
+@media (prefers-reduced-motion: reduce) { .check.trwa { animation: none; opacity: .55; } }

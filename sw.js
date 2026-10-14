@@ -1,7 +1,7 @@
 // Service worker: trzyma w telefonie TYLKO wygląd strony (pliki z tego repozytorium), żeby szybko się otwierała.
 // Danych nie zapisuje nigdy: zapytania do Google (logowanie, brama) w ogóle tu nie przechodzą.
-const WERSJA = 'nb-v7';
-const PLIKI = ['./', 'index.html', 'style.css?v=7', 'app.js?v=7', 'config.js?v=7', 'bledy.js?v=7', 'manifest.webmanifest', 'icon-192.png'];
+const WERSJA = 'nb-v8';
+const PLIKI = ['./', 'index.html', 'style.css?v=8', 'app.js?v=8', 'config.js?v=8', 'bledy.js?v=8', 'manifest.webmanifest', 'icon-192.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(WERSJA).then(c => c.addAll(PLIKI)).then(() => self.skipWaiting()));
