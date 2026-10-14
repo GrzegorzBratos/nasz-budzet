@@ -1,12 +1,14 @@
-// Nasz budżet – v9 (14.10; aplikacja = podsumowanie; jeden blok „Stałe”, szczegóły płatności: tytuł i konto): ekran „Ten miesiąc” – salda na górze, bloki zwinięte, stałe: do zapłacenia / schodzą same,
+// Nasz budżet – v10 (14.10: przepustka na 30 dni – logowanie raz na miesiąc; v9: aplikacja = podsumowanie; jeden blok „Stałe”, szczegóły płatności: tytuł i konto): ekran „Ten miesiąc” – salda na górze, bloki zwinięte, stałe: do zapłacenia / schodzą same,
 // wpływy: stałe / okazjonalne (zwroty nie są wpływem – zmniejszają wydatek w swoim rodzaju).
-// Bilet logowania i dane trzymamy wyłącznie w pamięci strony – po zamknięciu znikają. Nic nie zapisujemy w telefonie.
+// Dane trzymamy wyłącznie w pamięci strony – po zamknięciu znikają. W telefonie zapisujemy TYLKO przepustkę od bramy
+// (losowy klucz, ważny 30 dni, bez żadnych danych; „Wyloguj” ją kasuje także w bramie).
 // Wszystkie teksty z banku wstawiamy jako tekst (esc), nigdy jako kod strony.
 (function () {
   'use strict';
   const CFG = window.NB_CONFIG;
-  let bilet = null, dane = null, czekanie = null;
-  const WERSJA = 9;
+  let bilet = null, przepustka = null, dane = null, czekanie = null, googleGotowe = false;
+  const WERSJA = 10;
+  const KLUCZ_PRZEPUSTKI = 'nb_przepustka';
   const otwarte = {};                                   // wszystkie bloki zwinięte na start (G 14.10)
   const wToku = {};                                     // odhaczenia wysłane do bramy, jeszcze bez odpowiedzi: klucz → docelowy stan                                   // które bloki rozwinięte (tylko w pamięci, do zamknięcia aplikacji)
   const $ = s => document.querySelector(s);
@@ -19,20 +21,37 @@
   function toast(t) { const el = $('#toast'); el.innerHTML = '<div class="toast" role="status">' + esc(t) + '</div>'; clearTimeout(toast.h); toast.h = setTimeout(() => el.innerHTML = '', 2000); }
 
   async function api(akcja, dodatki) {
-    const r = await fetch(CFG.api, { method: 'POST', body: JSON.stringify(Object.assign({ bilet: bilet, akcja: akcja }, dodatki || {})), redirect: 'follow' });
+    const wejscie = przepustka ? { przepustka: przepustka } : { bilet: bilet };
+    const r = await fetch(CFG.api, { method: 'POST', body: JSON.stringify(Object.assign(wejscie, { akcja: akcja }, dodatki || {})), redirect: 'follow' });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     return r.json();
   }
 
   // ---------- logowanie ----------
-  async function poZalogowaniu(odp) { bilet = odp.credential; clearTimeout(czekanie); await wczytaj(); }
+  // Przepustka w telefonie (try/catch – w niektórych trybach przeglądarki zapis jest zablokowany; wtedy po prostu logujemy się jak dawniej).
+  function przepustkaZPamieci() {
+    try { const o = JSON.parse(localStorage.getItem(KLUCZ_PRZEPUSTKI) || 'null'); return o && typeof o.p === 'string' && Number(o.w) > Date.now() ? o.p : null; } catch (e) { return null; }
+  }
+  function zapamietajPrzepustke(p, w) { try { localStorage.setItem(KLUCZ_PRZEPUSTKI, JSON.stringify({ p: p, w: w })); } catch (e) {} }
+  function zapomnijPrzepustke() { przepustka = null; try { localStorage.removeItem(KLUCZ_PRZEPUSTKI); } catch (e) {} }
+
+  async function poZalogowaniu(odp) {
+    bilet = odp.credential; clearTimeout(czekanie);
+    const ok = await wczytaj();
+    if (!ok) return;
+    try { const w = await api('przepustka'); if (w.ok && w.przepustka) { zapamietajPrzepustke(w.przepustka, w.wazna); przepustka = w.przepustka; bilet = null; } } catch (e) {}
+  }
   async function wczytaj(swieze) {
     if (!dane) szkielet();
     try {
       const w = await api('ten-miesiac', swieze ? { swieze: true } : null);
-      if (!w.ok) { if (w.blad === 'brak dostępu') { bilet = null; pokazLogowanie(); stan('To konto nie ma dostępu do naszego budżetu.', 'blad'); } else stan('Nie udało się: ' + w.blad, 'blad'); return; }
-      dane = w; $('#logowanie').hidden = true; $('#ekran').hidden = false; stan(''); rysuj();
-    } catch (e) { stan('Brak połączenia z arkuszem. Spróbuj za chwilę.', 'blad'); if (dane) rysuj(); }
+      if (!w.ok) {
+        if (w.blad === 'brak dostępu' && przepustka) { zapomnijPrzepustke(); dane = null; logujGoogle(); return false; }   // przepustka wygasła / unieważniona → zwykłe logowanie
+        if (w.blad === 'brak dostępu') { bilet = null; pokazLogowanie(); stan('To konto nie ma dostępu do naszego budżetu.', 'blad'); } else stan('Nie udało się: ' + w.blad, 'blad');
+        return false;
+      }
+      dane = w; $('#logowanie').hidden = true; $('#ekran').hidden = false; stan(''); rysuj(); return true;
+    } catch (e) { stan('Brak połączenia z arkuszem. Spróbuj za chwilę.', 'blad'); if (dane) rysuj(); return false; }
   }
   function pokazLogowanie() { $('#ekran').hidden = true; $('#logowanie').hidden = false; }
 
@@ -43,7 +62,12 @@
     $('#tresc').innerHTML = '<div class="saldo"><div style="flex:1"><div class="sk" style="width:40%"></div><div class="sk sk-v"></div></div></div>' + '<div class="hero"><div class="sk sk-ring"></div><div style="flex:1"><div class="sk" style="width:70%"></div><div class="sk sk-v"></div><div class="sk" style="width:55%"></div></div></div>' +
       b(60) + b(45) + b(55) + b(40) + b(50);
   }
-  function wyloguj() { bilet = null; dane = null; google.accounts.id.disableAutoSelect(); pokazLogowanie(); stan('Wylogowano.'); }
+  function wyloguj() {
+    if (przepustka) api('wyloguj').catch(() => {});                         // brama kasuje przepustkę tego telefonu
+    zapomnijPrzepustke(); bilet = null; dane = null;
+    if (googleGotowe) google.accounts.id.disableAutoSelect();
+    pokazLogowanie(); stan('Wylogowano.');
+  }
 
   // ---------- ekran „Ten miesiąc” ----------
   function rysuj() {
@@ -230,14 +254,25 @@
     const app = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
     return app ? 'aplikacja' : 'przeglądarka';
   }
-  function start() {
-    if (!window.google || !google.accounts || !google.accounts.id) { stan('Nie wczytało się logowanie Google. Odśwież stronę.', 'blad'); return; }
+  // Logowanie Google: przygotowanie przycisku (raz) i próba cichego zalogowania.
+  function przygotujGoogle() {
+    if (googleGotowe) return true;
+    if (!window.google || !google.accounts || !google.accounts.id) return false;
     google.accounts.id.initialize({ client_id: CFG.clientId, callback: poZalogowaniu, auto_select: true, cancel_on_tap_outside: false, use_fedcm_for_prompt: true });
     google.accounts.id.renderButton($('#przycisk'), { theme: 'outline', size: 'large', shape: 'pill', text: 'signin_with', locale: 'pl' });
-    // Zalogowany wcześniej → od razu szkielet; jeśli Google nie zaloguje sam (pierwszy raz, wylogowanie) – pokazujemy przycisk.
+    googleGotowe = true; return true;
+  }
+  function logujGoogle() {
+    if (!przygotujGoogle()) { pokazLogowanie(); stan('Nie wczytało się logowanie Google. Odśwież stronę.', 'blad'); return; }
+    // Jeśli Google nie zaloguje sam (pierwszy raz, kilka kont, wylogowanie) – pokazujemy przycisk.
     szkielet();
     czekanie = setTimeout(() => { if (!bilet) pokazLogowanie(); }, 5000);
     google.accounts.id.prompt(n => { if (!bilet && n && ((n.isNotDisplayed && n.isNotDisplayed()) || (n.isSkippedMoment && n.isSkippedMoment()))) { clearTimeout(czekanie); pokazLogowanie(); } });
+  }
+  function start() {
+    przepustka = przepustkaZPamieci();
+    if (przepustka) { przygotujGoogle(); wczytaj(); return; }                  // jest przepustka → bez logowania Google
+    logujGoogle();
   }
   window.NB_TEST = { pokaz: w => { dane = w; $('#logowanie').hidden = true; $('#ekran').hidden = false; rysuj(); } };   // tylko do prób na danych przykładowych
   window.addEventListener('load', () => {
