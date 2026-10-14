@@ -1,4 +1,4 @@
-// Nasz budżet – v10 (14.10: przepustka na 30 dni – logowanie raz na miesiąc; v9: aplikacja = podsumowanie; jeden blok „Stałe”, szczegóły płatności: tytuł i konto): ekran „Ten miesiąc” – salda na górze, bloki zwinięte, stałe: do zapłacenia / schodzą same,
+// Nasz budżet – v11 (14.10: rata pokryta saldem konta do rat = zapłacona; v10: przepustka na 30 dni – logowanie raz na miesiąc; v9: aplikacja = podsumowanie; jeden blok „Stałe”, szczegóły płatności: tytuł i konto): ekran „Ten miesiąc” – salda na górze, bloki zwinięte, stałe: do zapłacenia / schodzą same,
 // wpływy: stałe / okazjonalne (zwroty nie są wpływem – zmniejszają wydatek w swoim rodzaju).
 // Dane trzymamy wyłącznie w pamięci strony – po zamknięciu znikają. W telefonie zapisujemy TYLKO przepustkę od bramy
 // (losowy klucz, ważny 30 dni, bez żadnych danych; „Wyloguj” ją kasuje także w bramie).
@@ -7,7 +7,7 @@
   'use strict';
   const CFG = window.NB_CONFIG;
   let bilet = null, przepustka = null, dane = null, czekanie = null, googleGotowe = false;
-  const WERSJA = 10;
+  const WERSJA = 11;
   const KLUCZ_PRZEPUSTKI = 'nb_przepustka';
   const otwarte = {};                                   // wszystkie bloki zwinięte na start (G 14.10)
   const wToku = {};                                     // odhaczenia wysłane do bramy, jeszcze bez odpowiedzi: klucz → docelowy stan                                   // które bloki rozwinięte (tylko w pamięci, do zamknięcia aplikacji)
@@ -155,6 +155,7 @@
   }
   // Jeden blok „Stałe” (14.10): obraz miesiąca; działania są w „Do zrobienia”. Znaczek jak tam: ✓ bank, szary ✓ odhaczone, ○ jeszcze nie.
   function stanStalej(y) {
+    if (y.naKoncieRat) return { kl: 'ok', zn: '✓', s: 'przelane na konto do rat' };
     if (y.zaplacono > 0) return { kl: 'ok', zn: '✓', s: 'zapłacone ' + y.platnosci[0].d };
     const z = (dane.zadania || []).find(x => x.typ === 'zaplac' && x.tytul === 'Zapłać: ' + y.nazwa && (x.stan === 'odhaczone' || x.stan === 'sprawdź'));
     if (z) return { kl: 'ok szary', zn: '✓', s: 'odhaczone – czekam na bank' };
@@ -198,9 +199,10 @@
   }
   function oknoY(i) {
     const y = dane.Y.pozycje[i];
-    const srodek = y.platnosci.length ? '<div class="sec"><span>Rozliczone płatnością z banku</span></div>' + lista(y.platnosci).replace('margin-top:12px', '')
+    const srodek = y.naKoncieRat ? `<div class="field"><span class="s">Pieniądze</span><span>są już na koncie do rat (${esc(y.platnosci[0].konto)})</span></div><div class="field"><span class="s">Bank pobierze</span><span>${esc(y.termin || '—')}</span></div>`
+      : y.platnosci.length ? '<div class="sec"><span>Rozliczone płatnością z banku</span></div>' + lista(y.platnosci).replace('margin-top:12px', '')
       : `<div class="field"><span class="s">Termin</span><span>${esc(y.termin || '—')}</span></div><div class="field"><span class="s">Kwota zwykle</span><span class="num">${zl(y.kwota)}</span></div><div class="field"><span class="s">Co ile</span><span>${esc(y.okres)}</span></div>`;
-    okno(y.nazwa, y.zaplacono > 0 ? y.zaplacono : y.kwota, (y.zaplacono > 0 ? 'zapłacone' : 'niezapłacone') + ' · ' + krotko(y.rodz), srodek);
+    okno(y.nazwa, y.zaplacono > 0 ? y.zaplacono : y.kwota, (y.naKoncieRat ? 'przelane na konto do rat' : y.zaplacono > 0 ? 'zapłacone' : 'niezapłacone') + ' · ' + krotko(y.rodz), srodek);
   }
 
   // ---------- okna od dołu, gesty i cofanie (iOS i Android) – jak w prototypie ----------
