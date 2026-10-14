@@ -86,3 +86,10 @@ button:disabled { opacity: .6; }
 .chev { width: 9px; height: 9px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(-45deg); flex: none; margin-left: 2px; transition: transform .15s; }
 .chev.o { transform: rotate(45deg); }
 .blok .glowa .t { white-space: normal; }
+/* 14.10: „Do zrobienia” */
+button.check { padding: 0; border-radius: 50%; background: transparent; cursor: pointer; min-width: 24px; }
+button.check.wait { border: 1.5px solid var(--muted); }
+.check.szary { background: var(--line); color: var(--muted); }
+.check.uwaga { background: var(--rose); color: var(--rose-ink); }
+.row.zrobione .t { color: var(--muted); }
+.blok + .hero { margin-top: 12px; }
