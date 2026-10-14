@@ -1,4 +1,4 @@
-// Nasz budżet – v8 (14.10; aplikacja = podsumowanie; „Do zrobienia”: odhaczanie od razu, zapis w tle): ekran „Ten miesiąc” – salda na górze, bloki zwinięte, stałe: do zapłacenia / schodzą same,
+// Nasz budżet – v9 (14.10; aplikacja = podsumowanie; jeden blok „Stałe”, szczegóły płatności: tytuł i konto): ekran „Ten miesiąc” – salda na górze, bloki zwinięte, stałe: do zapłacenia / schodzą same,
 // wpływy: stałe / okazjonalne (zwroty nie są wpływem – zmniejszają wydatek w swoim rodzaju).
 // Bilet logowania i dane trzymamy wyłącznie w pamięci strony – po zamknięciu znikają. Nic nie zapisujemy w telefonie.
 // Wszystkie teksty z banku wstawiamy jako tekst (esc), nigdy jako kod strony.
@@ -6,7 +6,7 @@
   'use strict';
   const CFG = window.NB_CONFIG;
   let bilet = null, dane = null, czekanie = null;
-  const WERSJA = 8;
+  const WERSJA = 9;
   const otwarte = {};                                   // wszystkie bloki zwinięte na start (G 14.10)
   const wToku = {};                                     // odhaczenia wysłane do bramy, jeszcze bez odpowiedzi: klucz → docelowy stan                                   // które bloki rozwinięte (tylko w pamięci, do zamknięcia aplikacji)
   const $ = s => document.querySelector(s);
@@ -129,18 +129,23 @@
         <span class="num">${zl(g.suma)}</span></div>`).join('') || '<div class="row"><div class="main s">Brak wydatków zmiennych.</div></div>';
     return blok('z', 'Zmienne – na co poszło', ile(Z.grupy.length, 'rodzaj', 'rodzaje', 'rodzajów'), zl(Z.suma), w);
   }
+  // Jeden blok „Stałe” (14.10): obraz miesiąca; działania są w „Do zrobienia”. Znaczek jak tam: ✓ bank, szary ✓ odhaczone, ○ jeszcze nie.
+  function stanStalej(y) {
+    if (y.zaplacono > 0) return { kl: 'ok', zn: '✓', s: 'zapłacone ' + y.platnosci[0].d };
+    const z = (dane.zadania || []).find(x => x.typ === 'zaplac' && x.tytul === 'Zapłać: ' + y.nazwa && (x.stan === 'odhaczone' || x.stan === 'sprawdź'));
+    if (z) return { kl: 'ok szary', zn: '✓', s: 'odhaczone – czekam na bank' };
+    return { kl: 'wait', zn: '', s: (y.platnosc === 'automatyczna' ? 'zejdzie samo · ' : '') + 'termin ' + (y.termin || '—') };
+  }
   function blokY(Y) {
-    const poz = Y.pozycje.map((y, i) => Object.assign({ i: i }, y));
-    const reczne = poz.filter(y => y.platnosc !== 'automatyczna'), same = poz.filter(y => y.platnosc === 'automatyczna');
-    reczne.sort((a, b) => (a.zaplacono > 0) - (b.zaplacono > 0) || String(a.terminISO || '9').localeCompare(String(b.terminISO || '9')));
+    const poz = Y.pozycje.map((y, i) => Object.assign({ i: i, st: null }, y)); poz.forEach(y => y.st = stanStalej(y));
+    poz.sort((a, b) => (a.zaplacono > 0) - (b.zaplacono > 0) || String(a.terminISO || '9').localeCompare(String(b.terminISO || '9')));
     const w = y => `<div class="row tap" data-y="${y.i}" role="button" tabindex="0">
-        <span class="check ${y.zaplacono > 0 ? 'ok' : 'wait'}">${y.zaplacono > 0 ? '✓' : ''}</span>
-        <div class="main"><div class="t">${esc(y.nazwa)}</div><div class="s">${y.zaplacono > 0 ? 'zapłacone ' + esc(y.platnosci[0].d) : 'termin ' + esc(y.termin || '—')} · ${esc(krotko(y.rodz))}</div></div>
+        <span class="check ${y.st.kl}">${y.st.zn}</span>
+        <div class="main"><div class="t">${esc(y.nazwa)}</div><div class="s">${esc(y.st.s)} · ${esc(krotko(y.rodz))}</div></div>
         <span class="num">${zl(y.zaplacono > 0 ? y.zaplacono : y.kwota)}</span></div>`;
-    const suma = L => L.reduce((s, y) => s + Math.max(y.kwota, y.zaplacono), 0), zap = L => L.reduce((s, y) => s + y.zaplacono, 0);
-    const brak = L => L.filter(y => !(y.zaplacono > 0)).length;
-    return blok('yr', 'Stałe – do zapłacenia', brak(reczne) ? 'do zapłacenia: ' + brak(reczne) + ' z ' + reczne.length : 'wszystko zapłacone', zl2(zap(reczne), suma(reczne)), reczne.map(w).join('') || '<div class="row"><div class="main s">Brak.</div></div>') +
-      blok('ya', 'Stałe – schodzą same', ile(same.length, 'pozycja', 'pozycje', 'pozycji') + (brak(same) ? ' · jeszcze nie zeszło: ' + brak(same) : ''), zl2(zap(same), suma(same)), same.map(w).join('') || '<div class="row"><div class="main s">Brak.</div></div>');
+    const brak = poz.filter(y => !(y.zaplacono > 0)).length;
+    return blok('y', 'Stałe', brak ? 'jeszcze nie zeszło: ' + brak + ' z ' + poz.length : 'wszystko zeszło', zl2(Y.zaplacono, Y.suma),
+      poz.map(w).join('') || '<div class="row"><div class="main s">Brak.</div></div>');
   }
   function blokX(X) {
     const st = X.stale || { suma: 0, grupy: [] }, ok = X.okazjonalne || { suma: X.suma, grupy: X.grupy };
@@ -152,7 +157,7 @@
   }
 
   function lista(tx) {
-    return '<div class="list" style="margin-top:12px">' + tx.map(p => `<div class="row"><div class="main"><div class="t">${esc(p.kontr)}</div><div class="s">${esc(p.d)}</div></div><span class="num">${zl(p.k)}</span></div>`).join('') + '</div>';
+    return '<div class="list" style="margin-top:12px">' + tx.map(p => `<div class="row"><div class="main"><div class="t">${esc(p.kontr)}</div>${p.tyt ? `<div class="s">${esc(p.tyt)}</div>` : ''}<div class="s">${esc(p.d)}${p.konto ? ' · z konta: ' + esc(p.konto) : ''}</div></div><span class="num">${zl(p.k)}</span></div>`).join('') + '</div>';
   }
   function okno(tytul, kwota, pod, srodek) {
     $('#sheet').innerHTML = `<div class="sheet-bg" id="bg"><div class="sheet" role="dialog" aria-label="${esc(tytul)}">
