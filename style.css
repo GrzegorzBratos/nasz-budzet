@@ -76,3 +76,13 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .sk-ring { width: 110px; height: 110px; border-radius: 50%; border: 12px solid var(--line); background: none; flex: none; margin: 0; }
 @media (prefers-reduced-motion: no-preference) { .sk { animation: puls 1.2s ease-in-out infinite; } @keyframes puls { 50% { opacity: .45; } } }
 button:disabled { opacity: .6; }
+
+/* 14.10: salda na górze, bloki zwijane */
+.saldo { background: var(--card); border-radius: 18px; padding: 16px 18px; display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; margin-bottom: 12px; }
+.saldo .v { font-family: var(--font-d); font-size: 30px; font-weight: 700; letter-spacing: -.02em; }
+.saldo .l { color: var(--muted); font-size: 14px; } .saldo .r { text-align: right; }
+.blok { background: var(--card); border-radius: 14px; overflow: hidden; margin-top: 12px; }
+.blok .glowa .b { font-weight: 600; }
+.chev { width: 9px; height: 9px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(-45deg); flex: none; margin-left: 2px; transition: transform .15s; }
+.chev.o { transform: rotate(45deg); }
+.blok .glowa .t { white-space: normal; }
