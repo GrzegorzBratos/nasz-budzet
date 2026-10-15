@@ -100,3 +100,14 @@ button.check.wait { border: 1.5px solid var(--muted); }
 .check.trwa { animation: trwa .8s ease-in-out infinite; }
 @keyframes trwa { 50% { transform: scale(.82); opacity: .55; } }
 @media (prefers-reduced-motion: reduce) { .check.trwa { animation: none; opacity: .55; } }
+/* 15.10: plan miesiąca */
+.seg { display: flex; background: var(--line); border-radius: 10px; padding: 2px; gap: 2px; margin: 4px 0 10px; }
+.seg button { flex: 1; background: transparent; color: var(--fg); font-weight: 500; padding: 7px 8px; border-radius: 8px; font-size: 14px; }
+.seg button.on { background: var(--card); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.sheet input { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; min-width: 0; }
+.sheet input:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+.sheet input.kw { width: 110px; text-align: right; font-variant-numeric: tabular-nums; }
+.row.dodaj input:not(.kw) { flex: 1; }
+.row.dodaj .kw { width: 92px; }
+.usun { padding: 4px 8px; }
+label.row { cursor: text; }

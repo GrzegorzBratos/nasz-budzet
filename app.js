@@ -1,4 +1,4 @@
-// Nasz budżet – v13 (14.10: najem na czysto – koszty mieszkania odjęte od najmu, nie ma ich w „Stałe”; v12: kwoty z groszami; v11: rata pokryta saldem konta do rat = zapłacona; v10: przepustka na 30 dni – logowanie raz na miesiąc; v9: aplikacja = podsumowanie; jeden blok „Stałe”, szczegóły płatności: tytuł i konto): ekran „Ten miesiąc” – salda na górze, bloki zwinięte, stałe: do zapłacenia / schodzą same,
+// Nasz budżet – v14 (15.10: plan miesiąca – X / Y / A / jednorazowe / Z, „ile MUSIMY”, zapis z telefonu; v13 14.10: najem na czysto – koszty mieszkania odjęte od najmu, nie ma ich w „Stałe”; v12: kwoty z groszami; v11: rata pokryta saldem konta do rat = zapłacona; v10: przepustka na 30 dni – logowanie raz na miesiąc; v9: aplikacja = podsumowanie; jeden blok „Stałe”, szczegóły płatności: tytuł i konto): ekran „Ten miesiąc” – salda na górze, bloki zwinięte, stałe: do zapłacenia / schodzą same,
 // wpływy: stałe / okazjonalne (zwroty nie są wpływem – zmniejszają wydatek w swoim rodzaju).
 // Dane trzymamy wyłącznie w pamięci strony – po zamknięciu znikają. W telefonie zapisujemy TYLKO przepustkę od bramy
 // (losowy klucz, ważny 30 dni, bez żadnych danych; „Wyloguj” ją kasuje także w bramie).
@@ -7,7 +7,7 @@
   'use strict';
   const CFG = window.NB_CONFIG;
   let bilet = null, przepustka = null, dane = null, czekanie = null, googleGotowe = false;
-  const WERSJA = 13;
+  const WERSJA = 14;
   const KLUCZ_PRZEPUSTKI = 'nb_przepustka';
   const otwarte = {};                                   // wszystkie bloki zwinięte na start (G 14.10)
   const wToku = {};                                     // odhaczenia wysłane do bramy, jeszcze bez odpowiedzi: klucz → docelowy stan                                   // które bloki rozwinięte (tylko w pamięci, do zamknięcia aplikacji)
@@ -89,6 +89,7 @@
           <div class="l num">średnio w miesiącu ${zl(Z.srednia12)}</div>
           <div class="l num">w tym tempie ${zl(tempo)}</div></div>
       </div>
+      ${kartaPlanu(d.plan)}
       <div class="fresh"><span>Dane z banku: ${esc(d.daneZ || '—')}</span><button class="b-soft" id="odswiez" type="button">Odśwież</button></div>
 
       ${blokZ(Z)}
@@ -213,6 +214,73 @@
     okno(y.nazwa, y.zaplacono > 0 ? y.zaplacono : y.kwota, (y.naKoncieRat ? 'przelane na konto do rat' : y.zaplacono > 0 ? 'zapłacone' : 'niezapłacone') + ' · ' + krotko(y.rodz), srodek);
   }
 
+  // ---------- plan miesiąca (15.10): X − Y − A − jednorazowe = Z na zmienne; A i jednorazowe wpisywane tutaj ----------
+  let plan = null;                                          // { m: 'biezacy'|'nastepny', A, J: [{nazwa, kwota}], zmienione, zapis }
+  const liczba = t => { const n = Number(String(t || '').replace(/[\s ]/g, '').replace(',', '.')); return isFinite(n) ? Math.round(n * 100) / 100 : NaN; };
+  function kartaPlanu(P) {
+    if (!P) return '';
+    const p = P.biezacy;
+    return `<div class="blok"><div class="row tap glowa" data-plan="1" role="button" tabindex="0">
+      <div class="main"><div class="t b">Plan miesiąca</div><div class="s">na zmienne · średnio ${zl(p.srednia12)}</div></div>
+      <span class="num b">${zl(p.Z)}</span><span class="chev" aria-hidden="true"></span></div></div>`;
+  }
+  function planStart(m) {
+    const p = dane.plan[m];
+    plan = { m: m, A: p.A, J: p.jednorazowe.map(x => ({ nazwa: x.nazwa, kwota: x.kwota })), zmienione: false, zapis: false };
+  }
+  function planZ() { const p = dane.plan[plan.m]; return Math.round((p.X - p.Y - plan.A - plan.J.reduce((s, x) => s + x.kwota, 0)) * 100) / 100; }
+  function oknoPlanu() {
+    if (!plan) planStart('biezacy');
+    const P = dane.plan, p = P[plan.m], Z = planZ(), luka = Math.round((p.srednia12 - Z) * 100) / 100;
+    const pole = (t, kw, s) => `<div class="row"><div class="main"><div class="t">${t}</div>${s ? `<div class="s">${s}</div>` : ''}</div><span class="num">${kw}</span></div>`;
+    const wpl = p.wplywy.map(x => pole(esc(x.nazwa), zl(x.kwota), x.okazjonalny ? 'okazjonalny – już wpłynął' : '')).join('');
+    const jedn = plan.J.map((x, i) => `<div class="row"><div class="main"><div class="t">${esc(x.nazwa)}</div></div><span class="num">${zl(x.kwota)}</span>
+        <button class="b-ghost usun" data-pj-usun="${i}" type="button" aria-label="Usuń ${esc(x.nazwa)}">✕</button></div>`).join('');
+    $('#sheet').innerHTML = `<div class="sheet-bg" id="bg"><div class="sheet" role="dialog" aria-label="Plan miesiąca">
+      <div class="grab"></div>
+      <div class="seg" role="tablist">${['biezacy', 'nastepny'].map(m => `<button type="button" role="tab" data-pm="${m}" aria-selected="${plan.m === m}" class="${plan.m === m ? 'on' : ''}">${esc(P[m].nazwa)}</button>`).join('')}</div>
+      <div class="sheet-head"><h2>Na zmienne</h2><span class="num" id="pZ">${zl(Z)}</span></div>
+      <div class="s">${esc(p.od)} – ${esc(p.do)} · wpływy − stałe − oszczędności − jednorazowe</div>
+      <div class="sec"><span>Wpływy</span><span class="num">${zl(p.X)}</span></div><div class="list">${wpl || pole('Brak wpływów stałych', '', '')}</div>
+      <div class="sec"><span>Stałe</span><span class="num">${zl(p.Y)}</span></div>
+      <div class="sec"><span>Oszczędności</span></div>
+      <div class="list"><label class="row"><div class="main"><div class="t">Na Oszczędnościowe</div></div>
+        <input class="kw" id="pA" inputmode="decimal" autocomplete="off" value="${kw(plan.A)}" aria-label="Kwota na oszczędności"><span class="s">zł</span></label></div>
+      <div class="sec"><span>Jednorazowe</span><span class="num">${zl(plan.J.reduce((s, x) => s + x.kwota, 0))}</span></div>
+      <div class="list">${jedn}<div class="row dodaj"><input id="pjN" maxlength="60" placeholder="Nazwa, np. prezent" autocomplete="off" aria-label="Nazwa wydatku jednorazowego">
+        <input class="kw" id="pjK" inputmode="decimal" placeholder="0,00" autocomplete="off" aria-label="Kwota"><button class="b-soft" id="pjDodaj" type="button">Dodaj</button></div></div>
+      <div class="sec"><span>Porównanie</span></div>
+      <div class="list">${pole('Średnio na zmienne', zl(p.srednia12), '12 pełnych miesięcy')}${pole('Poprzedni miesiąc', zl(p.poprzedni), '')}${p.wydaneZ != null ? pole('Wydane do dziś', zl(p.wydaneZ), '') : ''}
+        ${pole(luka > 0 ? 'Brakuje do średniej' : 'Ponad średnią', `<span id="pL">${zl(Math.abs(luka))}</span>`, '')}</div>
+      <div class="sec"><span>Ile musimy</span><span class="num">${zl(p.musimy.razem)}</span></div>
+      <div class="list">${pole('Stałe – Podstawa', zl(p.musimy.stale), '')}${pole('Zmienne – Podstawa', zl(p.musimy.zmienne), 'średnio w miesiącu')}</div>
+      <button class="b-soft big" id="pZapisz" type="button" ${plan.zmienione && !plan.zapis ? '' : 'disabled'}>${plan.zapis ? 'Zapisuję…' : plan.zmienione ? 'Zapisz plan' : 'Zapisane'}</button>
+      <button class="b-ghost big" id="zamknij" type="button">Zamknij</button></div></div>`;
+    bindSheet();
+  }
+  function planOdswiezLiczby() {
+    const Z = planZ(), p = dane.plan[plan.m], luka = Math.round((p.srednia12 - Z) * 100) / 100;
+    $('#pZ').textContent = zl(Z); $('#pL').textContent = zl(Math.abs(luka)); $('#pL').closest('.row').querySelector('.t').textContent = luka > 0 ? 'Brakuje do średniej' : 'Ponad średnią';
+    const b = $('#pZapisz'); b.disabled = !plan.zmienione || plan.zapis; b.textContent = plan.zapis ? 'Zapisuję…' : plan.zmienione ? 'Zapisz plan' : 'Zapisane';
+  }
+  async function planZapisz() {
+    const a = liczba($('#pA').value); if (!(a >= 0)) { toast('Kwota oszczędności – wpisz liczbę'); return; }
+    plan.A = a; plan.zapis = true; planOdswiezLiczby();
+    let w = null;
+    try { w = await api('plan-zapisz', { miesiac: dane.plan[plan.m].klucz, A: plan.A, jednorazowe: plan.J }); } catch (e) {}
+    plan.zapis = false;
+    if (w && w.ok) { const m = plan.m; dane = w; planStart(m); rysuj(); oknoPlanu(); toast('Plan zapisany'); }
+    else { planOdswiezLiczby(); toast(w ? 'Nie udało się: ' + (w.blad || 'błąd') : 'Brak połączenia – nie zapisano'); }
+  }
+  function confirmPlan() {
+    if (confirmPlan.raz) { confirmPlan.raz = false; return true; }
+    confirmPlan.raz = true; toast('Plan niezapisany – stuknij jeszcze raz, żeby przejść bez zapisu'); setTimeout(() => confirmPlan.raz = false, 3000); return false;
+  }
+  document.addEventListener('input', e => {
+    if (!plan || e.target.id !== 'pA') return;
+    const a = liczba(e.target.value); if (a >= 0) { plan.A = a; plan.zmienione = true; planOdswiezLiczby(); }
+  });
+
   // ---------- okna od dołu, gesty i cofanie (iOS i Android) – jak w prototypie ----------
   const stos = []; let hist = false;
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -249,7 +317,18 @@
   document.addEventListener('click', e => {
     const z = e.target.closest('[data-z]'), y = e.target.closest('[data-y]'), x = e.target.closest('[data-x]');
     const b = e.target.closest('[data-blok]'), sl = e.target.closest('[data-saldo]'), od = e.target.closest('[data-odhacz]');
-    if (od) odhacz(+od.dataset.odhacz);
+    const pl = e.target.closest('[data-plan]'), pm = e.target.closest('[data-pm]'), pu = e.target.closest('[data-pj-usun]');
+    if (pl) { plan = null; otworz(() => oknoPlanu()); }
+    else if (pm) { if (pm.dataset.pm !== plan.m) { if (plan.zmienione && !confirmPlan()) return; planStart(pm.dataset.pm); oknoPlanu(); } }
+    else if (pu) { plan.J.splice(+pu.dataset.pjUsun, 1); plan.zmienione = true; oknoPlanu(); }
+    else if (e.target.id === 'pjDodaj') {
+      const n = $('#pjN').value.replace(/\s+/g, ' ').trim(), k = liczba($('#pjK').value);
+      if (!n || !(k > 0)) { toast('Wpisz nazwę i kwotę'); return; }
+      plan.A = liczba($('#pA').value) >= 0 ? liczba($('#pA').value) : plan.A;
+      plan.J.push({ nazwa: n.slice(0, 60), kwota: k }); plan.zmienione = true; oknoPlanu();
+    }
+    else if (e.target.id === 'pZapisz') planZapisz();
+    else if (od) odhacz(+od.dataset.odhacz);
     else if (b) { otwarte[b.dataset.blok] = !otwarte[b.dataset.blok]; rysuj(); }
     else if (sl) otworz(() => oknoSald());
     else if (z) { const n = +z.dataset.z; otworz(() => oknoZ(n)); }
@@ -258,7 +337,7 @@
     else if (e.target.id === 'odswiez') { e.target.disabled = true; e.target.textContent = 'Liczę…'; wczytaj(true).then(() => dane && toast('Odświeżone')); }
     else if (e.target.id === 'wyloguj') wyloguj();
   });
-  document.addEventListener('keydown', e => { const r = e.target.closest('[data-z],[data-y],[data-x],[data-blok],[data-saldo]'); if (r && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); r.click(); } });
+  document.addEventListener('keydown', e => { const r = e.target.closest('[data-z],[data-y],[data-x],[data-blok],[data-saldo],[data-plan]'); if (r && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); r.click(); } });
 
   function tryb() {
     const app = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
