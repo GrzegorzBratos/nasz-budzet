@@ -1,4 +1,4 @@
-// Nasz budżet – v20 (15.10: ograniczenia po rodzajach w planie – „w tym miesiącu: X zł”; v19 15.10: karta stanu czytelna na wąskim telefonie – podpis nad kwotą, kwota się nie rozjeżdża; v18 15.10: „zwykle” = mediana 12 mies.; stan i plan mówią to samo (prognoza w tym tempie); wpłynęło / wpłynie; v17 15.10 wieczór: trzy zakładki Miesiąc / Plan / Wydatki; plan jako „czy nam starczy?” w zaokrągleniu do 100 zł; v16 15.10: jasny stan zmiennych zamiast koła; zapisy w tle bez czekania; odhaczone znikają z „Do zrobienia”; v15 15.10 popołudnie: poprawki rodzaju / „czego dotyczy” / poziomu z telefonu, „Z paragonów”; v14 15.10: plan miesiąca – X / Y / A / jednorazowe / Z, „ile MUSIMY”, zapis z telefonu; v13 14.10: najem na czysto – koszty mieszkania odjęte od najmu, nie ma ich w „Stałe”; v12: kwoty z groszami; v11: rata pokryta saldem konta do rat = zapłacona; v10: przepustka na 30 dni – logowanie raz na miesiąc; v9: aplikacja = podsumowanie; jeden blok „Stałe”, szczegóły płatności: tytuł i konto): ekran „Ten miesiąc” – salda na górze, bloki zwinięte, stałe: do zapłacenia / schodzą same,
+// Nasz budżet – v21 (15.10: zapis planu w tle – okno zamyka się od razu; v20 15.10: ograniczenia po rodzajach w planie – „w tym miesiącu: X zł”; v19 15.10: karta stanu czytelna na wąskim telefonie – podpis nad kwotą, kwota się nie rozjeżdża; v18 15.10: „zwykle” = mediana 12 mies.; stan i plan mówią to samo (prognoza w tym tempie); wpłynęło / wpłynie; v17 15.10 wieczór: trzy zakładki Miesiąc / Plan / Wydatki; plan jako „czy nam starczy?” w zaokrągleniu do 100 zł; v16 15.10: jasny stan zmiennych zamiast koła; zapisy w tle bez czekania; odhaczone znikają z „Do zrobienia”; v15 15.10 popołudnie: poprawki rodzaju / „czego dotyczy” / poziomu z telefonu, „Z paragonów”; v14 15.10: plan miesiąca – X / Y / A / jednorazowe / Z, „ile MUSIMY”, zapis z telefonu; v13 14.10: najem na czysto – koszty mieszkania odjęte od najmu, nie ma ich w „Stałe”; v12: kwoty z groszami; v11: rata pokryta saldem konta do rat = zapłacona; v10: przepustka na 30 dni – logowanie raz na miesiąc; v9: aplikacja = podsumowanie; jeden blok „Stałe”, szczegóły płatności: tytuł i konto): ekran „Ten miesiąc” – salda na górze, bloki zwinięte, stałe: do zapłacenia / schodzą same,
 // wpływy: stałe / okazjonalne (zwroty nie są wpływem – zmniejszają wydatek w swoim rodzaju).
 // Dane trzymamy wyłącznie w pamięci strony – po zamknięciu znikają. W telefonie zapisujemy TYLKO przepustkę od bramy
 // (losowy klucz, ważny 30 dni, bez żadnych danych; „Wyloguj” ją kasuje także w bramie).
@@ -7,7 +7,7 @@
   'use strict';
   const CFG = window.NB_CONFIG;
   let bilet = null, przepustka = null, dane = null, czekanie = null, googleGotowe = false;
-  const WERSJA = 20;
+  const WERSJA = 21;
   let widok = 'miesiac', planWidok = 'biezacy';            // 15.10 (v17): zakładka i miesiąc planu (tylko w pamięci strony)
   const KLUCZ_PRZEPUSTKI = 'nb_przepustka';
   const otwarte = {};                                   // wszystkie bloki zwinięte na start (G 14.10)
@@ -375,7 +375,7 @@
         <input class="kw" id="pjK" inputmode="decimal" placeholder="0,00" autocomplete="off" aria-label="Kwota"><button class="b-soft" id="pjDodaj" type="button">Dodaj</button></div></div>
       <div class="sec"><span>Ograniczenia w tym miesiącu</span></div>
       <div class="s" style="margin:0 4px 8px">Wpisz, ile chcecie wydać na rodzaj w tym miesiącu. Puste = jak zwykle.</div>
-      <div class="list">${ogr || '<div class="row"><div class="main s">Brak danych.</div></div>'}</div>
+      <div class="list">${ogr || '<div class="row"><div class="main s">Brak danych – zamknij i stuknij „Odśwież” na Miesiącu.</div></div>'}</div>
       <button class="b-soft big" id="pZapisz" type="button" ${plan.zmienione && !plan.zapis ? '' : 'disabled'}>${plan.zapis ? 'Zapisuję…' : plan.zmienione ? 'Zapisz plan' : 'Zapisane'}</button>
       <button class="b-ghost big" id="zamknij" type="button">Zamknij</button></div></div>`;
     bindSheet();
@@ -385,15 +385,16 @@
     $('#pZ').textContent = ok100(Z); $('#pZw').textContent = ok100(planZwykle()); el.className = 'werdykt maly ' + w.kl; el.querySelector('.werdykt-t').textContent = w.t;
     const b = $('#pZapisz'); b.disabled = !plan.zmienione || plan.zapis; b.textContent = plan.zapis ? 'Zapisuję…' : plan.zmienione ? 'Zapisz plan' : 'Zapisane';
   }
-  async function planZapisz() {
+  // 15.10 (v21): zapis w tle – plan na ekranie zmienia się od razu, arkusz dogania (kolejka zapisów jak przy poprawkach).
+  function planZapisz() {
     const a = liczba($('#pA').value); if (!(a >= 0)) { toast('Kwota oszczędności – wpisz liczbę'); return; }
-    plan.A = a; plan.zapis = true; planOdswiezLiczby();
-    let w = null;
-    try { w = await api('plan-zapisz', { miesiac: dane.plan[plan.m].klucz, A: plan.A, jednorazowe: plan.J,
-      limity: Object.keys(plan.L).map(r => ({ rodzaj: r, kwota: plan.L[r] })) }); } catch (e) {}
-    plan.zapis = false;
-    if (w && w.ok) { dane = w; plan = null; zamknijWszystkie(); rysuj(); toast('Plan zapisany'); }
-    else { planOdswiezLiczby(); toast(w ? 'Nie udało się: ' + (w.blad || 'błąd') : 'Brak połączenia – nie zapisano'); }
+    plan.A = a;
+    const p = dane.plan[plan.m], Z = planZ(), zw = planZwykle();
+    Object.assign(p, { A: a, jednorazowe: plan.J.slice(), J: plan.J.reduce((s, x) => s + x.kwota, 0), Z: Z, zwykleLim: zw });
+    (p.rodzaje || []).forEach(x => { if (plan.L[x.rodz] != null) x.limit = plan.L[x.rodz]; else delete x.limit; });
+    const dane2 = { miesiac: p.klucz, A: a, jednorazowe: plan.J, limity: Object.keys(plan.L).map(r => ({ rodzaj: r, kwota: plan.L[r] })) };
+    plan = null; zamknijWszystkie(); rysuj(); toast('Plan zapisany');
+    wTleZapis('plan-zapisz', dane2);
   }
   function confirmPlan() {
     if (confirmPlan.raz) { confirmPlan.raz = false; return true; }
