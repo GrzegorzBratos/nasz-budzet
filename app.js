@@ -1,4 +1,4 @@
-// Nasz budżet – v18 (15.10: „zwykle” = mediana 12 mies.; stan i plan mówią to samo (prognoza w tym tempie); wpłynęło / wpłynie; v17 15.10 wieczór: trzy zakładki Miesiąc / Plan / Wydatki; plan jako „czy nam starczy?” w zaokrągleniu do 100 zł; v16 15.10: jasny stan zmiennych zamiast koła; zapisy w tle bez czekania; odhaczone znikają z „Do zrobienia”; v15 15.10 popołudnie: poprawki rodzaju / „czego dotyczy” / poziomu z telefonu, „Z paragonów”; v14 15.10: plan miesiąca – X / Y / A / jednorazowe / Z, „ile MUSIMY”, zapis z telefonu; v13 14.10: najem na czysto – koszty mieszkania odjęte od najmu, nie ma ich w „Stałe”; v12: kwoty z groszami; v11: rata pokryta saldem konta do rat = zapłacona; v10: przepustka na 30 dni – logowanie raz na miesiąc; v9: aplikacja = podsumowanie; jeden blok „Stałe”, szczegóły płatności: tytuł i konto): ekran „Ten miesiąc” – salda na górze, bloki zwinięte, stałe: do zapłacenia / schodzą same,
+// Nasz budżet – v19 (15.10: karta stanu czytelna na wąskim telefonie – podpis nad kwotą, kwota się nie rozjeżdża; v18 15.10: „zwykle” = mediana 12 mies.; stan i plan mówią to samo (prognoza w tym tempie); wpłynęło / wpłynie; v17 15.10 wieczór: trzy zakładki Miesiąc / Plan / Wydatki; plan jako „czy nam starczy?” w zaokrągleniu do 100 zł; v16 15.10: jasny stan zmiennych zamiast koła; zapisy w tle bez czekania; odhaczone znikają z „Do zrobienia”; v15 15.10 popołudnie: poprawki rodzaju / „czego dotyczy” / poziomu z telefonu, „Z paragonów”; v14 15.10: plan miesiąca – X / Y / A / jednorazowe / Z, „ile MUSIMY”, zapis z telefonu; v13 14.10: najem na czysto – koszty mieszkania odjęte od najmu, nie ma ich w „Stałe”; v12: kwoty z groszami; v11: rata pokryta saldem konta do rat = zapłacona; v10: przepustka na 30 dni – logowanie raz na miesiąc; v9: aplikacja = podsumowanie; jeden blok „Stałe”, szczegóły płatności: tytuł i konto): ekran „Ten miesiąc” – salda na górze, bloki zwinięte, stałe: do zapłacenia / schodzą same,
 // wpływy: stałe / okazjonalne (zwroty nie są wpływem – zmniejszają wydatek w swoim rodzaju).
 // Dane trzymamy wyłącznie w pamięci strony – po zamknięciu znikają. W telefonie zapisujemy TYLKO przepustkę od bramy
 // (losowy klucz, ważny 30 dni, bez żadnych danych; „Wyloguj” ją kasuje także w bramie).
@@ -7,7 +7,7 @@
   'use strict';
   const CFG = window.NB_CONFIG;
   let bilet = null, przepustka = null, dane = null, czekanie = null, googleGotowe = false;
-  const WERSJA = 18;
+  const WERSJA = 19;
   let widok = 'miesiac', planWidok = 'biezacy';            // 15.10 (v17): zakładka i miesiąc planu (tylko w pamięci strony)
   const KLUCZ_PRZEPUSTKI = 'nb_przepustka';
   const otwarte = {};                                   // wszystkie bloki zwinięte na start (G 14.10)
@@ -308,9 +308,10 @@
     const s = stanZmiennych(d), o = d.okres, f = s.budzet > 0 ? Math.min(d.Z.suma / s.budzet, 1) : 1, t = o.dzien / o.dni;
     return `<div class="stan ${s.st[1]} tap" data-widok="plan" role="button" tabindex="0">
       <div class="stan-g"><span class="stan-chip">${s.st[0]}</span><span class="l">na życie do ${esc(o.do)}</span></div>
-      <div class="v num">${s.brak > 0 ? 'W tym tempie zabraknie ' + ok100(s.brak) : 'Zostało ' + zl(s.zostalo)}</div>
+      <div class="stan-k"><span class="l">${s.brak > 0 ? 'w tym tempie zabraknie' : 'zostało na życie'}</span><span class="v num">${s.brak > 0 ? ok100(s.brak) : zl(s.zostalo)}</span></div>
       <div class="bar" aria-hidden="true"><span style="width:${(f * 100).toFixed(1)}%"></span><i style="left:${(t * 100).toFixed(1)}%"></i></div>
-      <div class="l num">wydane ${zl(d.Z.suma)} z ${zl(s.budzet)} · ${s.zostalo > 0 ? 'zostało ' + zl(s.zostalo) + ', ok. ' + zl(s.dziennie) + ' na dzień' : 'ponad plan o ' + zl(-s.zostalo)}</div>
+      <div class="l num">wydane ${zl(d.Z.suma)} z ${zl(s.budzet)}</div>
+      <div class="l num">${s.zostalo > 0 ? 'zostało ' + zl(s.zostalo) + ' · ok. ' + zl(s.dziennie) + ' na dzień' : 'ponad plan o ' + zl(-s.zostalo)}</div>
       <div class="stan-d"><span class="l">w tym tempie wydacie na życie ${ok100(s.tempo)}</span><span class="stan-plan">Plan ›</span></div></div>`;
   }
 

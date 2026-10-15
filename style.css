@@ -154,3 +154,8 @@ body { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 84px); }
 .werdykt.ok { background: var(--mint); color: var(--mint-ink); } .werdykt.zle { background: var(--rose); color: var(--rose-ink); }
 .werdykt.maly { padding: 12px; margin-top: 8px; } .werdykt.maly .werdykt-t { font-size: 22px; } .werdykt.maly .werdykt-s { font-size: 14px; }
 .row.suma { background: var(--accent-soft); }
+/* 15.10 (v19): karta stanu na wąskim telefonie */
+.stan-k { display: grid; gap: 0; }
+.stan .v { font-size: clamp(24px, 8vw, 30px); line-height: 1.15; }
+.stan .l.num, .stan .stan-d .l { white-space: normal; overflow-wrap: anywhere; }
+.stan-chip { white-space: nowrap; }
