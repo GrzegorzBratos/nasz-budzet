@@ -121,3 +121,23 @@ input.tog { width: 22px; height: 22px; accent-color: var(--accent); flex: none; 
 .seg.poz button { font-size: 13px; padding: 7px 4px; }
 .sheet input.tog { padding: 0; border: 0; background: none; }
 @media (prefers-color-scheme: dark) { .seg button.on:not([data-poz]) { background: #48484A; } }
+/* 15.10 (v16): stan zmiennych – jedno zdanie zamiast koła */
+.stan { background: var(--card); border-radius: 18px; padding: 16px 18px; display: grid; gap: 6px; margin-top: 12px; }
+.stan .v { font-family: var(--font-d); font-size: 28px; font-weight: 700; letter-spacing: -.02em; }
+.stan .l { color: var(--muted); font-size: 14px; }
+.stan-g { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.stan-chip { font-weight: 700; font-size: 15px; padding: 4px 12px; border-radius: 20px; }
+.stan.ok .stan-chip { background: var(--mint); color: var(--mint-ink); } .stan.ok .bar span { background: var(--mint-ink); }
+.stan.uwaga .stan-chip { background: var(--peach); color: var(--peach-ink); } .stan.uwaga .bar span { background: var(--peach-ink); }
+.stan.zle .stan-chip { background: var(--rose); color: var(--rose-ink); } .stan.zle .bar span { background: var(--rose-ink); }
+.stan.zle .v { color: var(--rose-ink); }
+.bar { position: relative; height: 10px; border-radius: 5px; background: var(--line); margin: 4px 0; }
+.bar span { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 5px; }
+.bar i { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--fg); opacity: .45; border-radius: 1px; }
+.sheet select option, .sheet select optgroup { color: #1C1C1E; background: #FFFFFF; }
+@media (prefers-color-scheme: dark) { .sheet select option, .sheet select optgroup { color: #F2F2F7; background: #2C2C2E; } }
+.b-toast { background: transparent; color: inherit; text-decoration: underline; padding: 0 0 0 8px; font-weight: 700; }
+#zapisy { margin: 10px 4px 0; min-height: 1em; }
+.stan-d { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.stan-plan { color: var(--accent); font-weight: 600; font-size: 14px; white-space: nowrap; }
+.stan { grid-template-columns: minmax(0, 1fr); } .stan .l.num { white-space: normal; }
