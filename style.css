@@ -111,3 +111,13 @@ button.check.wait { border: 1.5px solid var(--muted); }
 .row.dodaj .kw { width: 92px; }
 .usun { padding: 4px 8px; }
 label.row { cursor: text; }
+/* 15.10 popołudnie: poprawki z telefonu, poziom, „Z paragonów” */
+.sheet select { font: inherit; color: var(--fg); background: transparent; border: 0; width: 100%; padding: 4px 0; min-width: 0; }
+.sheet select:focus { outline: 2px solid var(--accent); border-radius: 8px; }
+input.tog { width: 22px; height: 22px; accent-color: var(--accent); flex: none; }
+.seg.poz button.on[data-poz="Podstawa"] { background: var(--mint); color: var(--mint-ink); }
+.seg.poz button.on[data-poz="Wybór"] { background: var(--sky); color: var(--sky-ink); }
+.seg.poz button.on[data-poz="Do przyjrzenia się"] { background: var(--peach); color: var(--peach-ink); }
+.seg.poz button { font-size: 13px; padding: 7px 4px; }
+.sheet input.tog { padding: 0; border: 0; background: none; }
+@media (prefers-color-scheme: dark) { .seg button.on:not([data-poz]) { background: #48484A; } }
