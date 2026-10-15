@@ -1,4 +1,4 @@
-// Nasz budżet – v21 (15.10: zapis planu w tle – okno zamyka się od razu; v20 15.10: ograniczenia po rodzajach w planie – „w tym miesiącu: X zł”; v19 15.10: karta stanu czytelna na wąskim telefonie – podpis nad kwotą, kwota się nie rozjeżdża; v18 15.10: „zwykle” = mediana 12 mies.; stan i plan mówią to samo (prognoza w tym tempie); wpłynęło / wpłynie; v17 15.10 wieczór: trzy zakładki Miesiąc / Plan / Wydatki; plan jako „czy nam starczy?” w zaokrągleniu do 100 zł; v16 15.10: jasny stan zmiennych zamiast koła; zapisy w tle bez czekania; odhaczone znikają z „Do zrobienia”; v15 15.10 popołudnie: poprawki rodzaju / „czego dotyczy” / poziomu z telefonu, „Z paragonów”; v14 15.10: plan miesiąca – X / Y / A / jednorazowe / Z, „ile MUSIMY”, zapis z telefonu; v13 14.10: najem na czysto – koszty mieszkania odjęte od najmu, nie ma ich w „Stałe”; v12: kwoty z groszami; v11: rata pokryta saldem konta do rat = zapłacona; v10: przepustka na 30 dni – logowanie raz na miesiąc; v9: aplikacja = podsumowanie; jeden blok „Stałe”, szczegóły płatności: tytuł i konto): ekran „Ten miesiąc” – salda na górze, bloki zwinięte, stałe: do zapłacenia / schodzą same,
+// Nasz budżet – v22 (15.10: bilans miesiąca do dziś – wpłynęło − wydane; v21 15.10: zapis planu w tle – okno zamyka się od razu; v20 15.10: ograniczenia po rodzajach w planie – „w tym miesiącu: X zł”; v19 15.10: karta stanu czytelna na wąskim telefonie – podpis nad kwotą, kwota się nie rozjeżdża; v18 15.10: „zwykle” = mediana 12 mies.; stan i plan mówią to samo (prognoza w tym tempie); wpłynęło / wpłynie; v17 15.10 wieczór: trzy zakładki Miesiąc / Plan / Wydatki; plan jako „czy nam starczy?” w zaokrągleniu do 100 zł; v16 15.10: jasny stan zmiennych zamiast koła; zapisy w tle bez czekania; odhaczone znikają z „Do zrobienia”; v15 15.10 popołudnie: poprawki rodzaju / „czego dotyczy” / poziomu z telefonu, „Z paragonów”; v14 15.10: plan miesiąca – X / Y / A / jednorazowe / Z, „ile MUSIMY”, zapis z telefonu; v13 14.10: najem na czysto – koszty mieszkania odjęte od najmu, nie ma ich w „Stałe”; v12: kwoty z groszami; v11: rata pokryta saldem konta do rat = zapłacona; v10: przepustka na 30 dni – logowanie raz na miesiąc; v9: aplikacja = podsumowanie; jeden blok „Stałe”, szczegóły płatności: tytuł i konto): ekran „Ten miesiąc” – salda na górze, bloki zwinięte, stałe: do zapłacenia / schodzą same,
 // wpływy: stałe / okazjonalne (zwroty nie są wpływem – zmniejszają wydatek w swoim rodzaju).
 // Dane trzymamy wyłącznie w pamięci strony – po zamknięciu znikają. W telefonie zapisujemy TYLKO przepustkę od bramy
 // (losowy klucz, ważny 30 dni, bez żadnych danych; „Wyloguj” ją kasuje także w bramie).
@@ -7,7 +7,7 @@
   'use strict';
   const CFG = window.NB_CONFIG;
   let bilet = null, przepustka = null, dane = null, czekanie = null, googleGotowe = false;
-  const WERSJA = 21;
+  const WERSJA = 22;
   let widok = 'miesiac', planWidok = 'biezacy';            // 15.10 (v17): zakładka i miesiąc planu (tylko w pamięci strony)
   const KLUCZ_PRZEPUSTKI = 'nb_przepustka';
   const otwarte = {};                                   // wszystkie bloki zwinięte na start (G 14.10)
@@ -100,9 +100,16 @@
       widok = 'miesiac';
       $('#tytul').textContent = o.nazwa.charAt(0).toUpperCase() + o.nazwa.slice(1);
       $('#podtytul').textContent = o.od + ' – ' + o.do + ' · dzień ' + o.dzien + ' z ' + o.dni;
-      $('#tresc').innerHTML = `${kartaSald(d.salda)}${blokZadan(d.zadania)}${kartaStanu(d)}${swiezosc}${blokY(d.Y)}${blokX(d.X)}` + stopka;
+      $('#tresc').innerHTML = `${kartaSald(d.salda)}${blokZadan(d.zadania)}${kartaStanu(d)}${kartaBilansu(d)}${swiezosc}${blokY(d.Y)}${blokX(d.X)}` + stopka;
     }
     pasekZakladek();
+  }
+  // 15.10 (v22): bilans miesiąca do dziś – wszystko, co wpłynęło (z najmem na czysto), minus wszystko, co zeszło (stałe + na życie).
+  // Bez przelewów między naszymi kontami i bez „Poza budżetem”.
+  function kartaBilansu(d) {
+    const wpl = d.X.suma || 0, wyd = (d.Y.zaplacono || 0) + (d.Z.suma || 0), b = wpl - wyd;
+    return `<div class="bilans ${b >= 0 ? 'plus' : 'minus'}"><div class="main"><div class="t">Bilans miesiąca do dziś</div>
+      <div class="s">wpłynęło ${zl(wpl)} · zeszło ${zl(wyd)}</div></div><span class="num b">${b >= 0 ? '+' : '−'}${kw(b)} zł</span></div>`;
   }
   function ekranWydatkow(d) {
     const Z = d.Z, s = stanZmiennych(d), lim = {}; ((d.plan && d.plan.biezacy.rodzaje) || []).forEach(x => { if (x.limit != null) lim[x.rodz] = x.limit; });

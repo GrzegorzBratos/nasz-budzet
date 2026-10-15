@@ -161,3 +161,7 @@ body { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 84px); }
 .stan-chip { white-space: nowrap; }
 /* 15.10 (v20): ograniczenia po rodzajach */
 .bar.maly { height: 6px; margin: 6px 0 2px; } .bar.maly span { background: var(--accent); } .bar.maly.ponad span { background: var(--rose-ink); }
+/* 15.10 (v22): bilans miesiąca */
+.bilans { background: var(--card); border-radius: 14px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+.bilans .main { flex: 1; min-width: 0; } .bilans .num { font-size: 18px; font-weight: 700; }
+.bilans.plus .num { color: var(--mint-ink); } .bilans.minus .num { color: var(--rose-ink); }
