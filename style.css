@@ -141,3 +141,16 @@ input.tog { width: 22px; height: 22px; accent-color: var(--accent); flex: none; 
 .stan-d { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .stan-plan { color: var(--accent); font-weight: 600; font-size: 14px; white-space: nowrap; }
 .stan { grid-template-columns: minmax(0, 1fr); } .stan .l.num { white-space: normal; }
+/* 15.10 (v17): zakładki na dole, plan „czy nam starczy?” */
+body { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 84px); }
+#zakladki { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; display: flex; justify-content: center; gap: 4px;
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px)); background: color-mix(in srgb, var(--bg) 88%, transparent);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); border-top: 1px solid var(--line); }
+#zakladki button { flex: 1; max-width: 170px; background: transparent; color: var(--muted); font-weight: 600; font-size: 15px; padding: 10px 6px; border-radius: 12px; }
+#zakladki button.on { background: var(--accent-soft); color: var(--accent); }
+.werdykt { border-radius: 18px; padding: 18px; text-align: center; }
+.werdykt-t { font-family: var(--font-d); font-size: 34px; font-weight: 800; letter-spacing: -.02em; }
+.werdykt-s { font-size: 17px; margin-top: 2px; }
+.werdykt.ok { background: var(--mint); color: var(--mint-ink); } .werdykt.zle { background: var(--rose); color: var(--rose-ink); }
+.werdykt.maly { padding: 12px; margin-top: 8px; } .werdykt.maly .werdykt-t { font-size: 22px; } .werdykt.maly .werdykt-s { font-size: 14px; }
+.row.suma { background: var(--accent-soft); }

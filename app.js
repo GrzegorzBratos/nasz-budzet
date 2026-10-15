@@ -1,4 +1,4 @@
-// Nasz budżet – v16 (15.10: jasny stan zmiennych zamiast koła; zapisy w tle bez czekania; odhaczone znikają z „Do zrobienia”; v15 15.10 popołudnie: poprawki rodzaju / „czego dotyczy” / poziomu z telefonu, „Z paragonów”; v14 15.10: plan miesiąca – X / Y / A / jednorazowe / Z, „ile MUSIMY”, zapis z telefonu; v13 14.10: najem na czysto – koszty mieszkania odjęte od najmu, nie ma ich w „Stałe”; v12: kwoty z groszami; v11: rata pokryta saldem konta do rat = zapłacona; v10: przepustka na 30 dni – logowanie raz na miesiąc; v9: aplikacja = podsumowanie; jeden blok „Stałe”, szczegóły płatności: tytuł i konto): ekran „Ten miesiąc” – salda na górze, bloki zwinięte, stałe: do zapłacenia / schodzą same,
+// Nasz budżet – v17 (15.10 wieczór: trzy zakładki Miesiąc / Plan / Wydatki; plan jako „czy nam starczy?” w zaokrągleniu do 100 zł; v16 15.10: jasny stan zmiennych zamiast koła; zapisy w tle bez czekania; odhaczone znikają z „Do zrobienia”; v15 15.10 popołudnie: poprawki rodzaju / „czego dotyczy” / poziomu z telefonu, „Z paragonów”; v14 15.10: plan miesiąca – X / Y / A / jednorazowe / Z, „ile MUSIMY”, zapis z telefonu; v13 14.10: najem na czysto – koszty mieszkania odjęte od najmu, nie ma ich w „Stałe”; v12: kwoty z groszami; v11: rata pokryta saldem konta do rat = zapłacona; v10: przepustka na 30 dni – logowanie raz na miesiąc; v9: aplikacja = podsumowanie; jeden blok „Stałe”, szczegóły płatności: tytuł i konto): ekran „Ten miesiąc” – salda na górze, bloki zwinięte, stałe: do zapłacenia / schodzą same,
 // wpływy: stałe / okazjonalne (zwroty nie są wpływem – zmniejszają wydatek w swoim rodzaju).
 // Dane trzymamy wyłącznie w pamięci strony – po zamknięciu znikają. W telefonie zapisujemy TYLKO przepustkę od bramy
 // (losowy klucz, ważny 30 dni, bez żadnych danych; „Wyloguj” ją kasuje także w bramie).
@@ -7,7 +7,8 @@
   'use strict';
   const CFG = window.NB_CONFIG;
   let bilet = null, przepustka = null, dane = null, czekanie = null, googleGotowe = false;
-  const WERSJA = 16;
+  const WERSJA = 17;
+  let widok = 'miesiac', planWidok = 'biezacy';            // 15.10 (v17): zakładka i miesiąc planu (tylko w pamięci strony)
   const KLUCZ_PRZEPUSTKI = 'nb_przepustka';
   const otwarte = {};                                   // wszystkie bloki zwinięte na start (G 14.10)
   const wToku = {};                                     // odhaczenia wysłane do bramy, jeszcze bez odpowiedzi: klucz → docelowy stan                                   // które bloki rozwinięte (tylko w pamięci, do zamknięcia aplikacji)
@@ -59,7 +60,7 @@
       dane = w; $('#logowanie').hidden = true; $('#ekran').hidden = false; stan(''); rysuj(); return true;
     } catch (e) { stan('Brak połączenia z arkuszem. Spróbuj za chwilę.', 'blad'); if (dane) rysuj(); return false; }
   }
-  function pokazLogowanie() { $('#ekran').hidden = true; $('#logowanie').hidden = false; }
+  function pokazLogowanie() { $('#ekran').hidden = true; $('#logowanie').hidden = false; const z = $('#zakladki'); if (z) z.remove(); }
 
   // Szkielet ekranu – widać go od razu, zanim przyjdą dane (dane nie są trzymane w telefonie, więc nie ma czego pokazać wcześniej).
   function szkielet() {
@@ -76,21 +77,42 @@
   }
 
   // ---------- ekran „Ten miesiąc” ----------
+  // 15.10 (v17): trzy zakładki na dole – Miesiąc (stan, do zrobienia, stałe, wpływy), Plan („czy nam starczy?”), Wydatki (zmienne po rodzajach).
+  function pasekZakladek() {
+    let n = $('#zakladki');
+    if (!n) { n = document.createElement('nav'); n.id = 'zakladki'; n.setAttribute('role', 'tablist'); document.body.appendChild(n); }
+    n.innerHTML = [['miesiac', 'Miesiąc'], ['plan', 'Plan'], ['wydatki', 'Wydatki']].map(([k, t]) =>
+      `<button type="button" role="tab" data-widok="${k}" aria-selected="${widok === k}" class="${widok === k ? 'on' : ''}">${t}</button>`).join('');
+  }
   function rysuj() {
-    const d = dane, o = d.okres, Z = d.Z, Y = d.Y, X = d.X;
-    $('#tytul').textContent = o.nazwa.charAt(0).toUpperCase() + o.nazwa.slice(1);
-    $('#podtytul').textContent = o.od + ' – ' + o.do + ' · dzień ' + o.dzien + ' z ' + o.dni;
-    $('#tresc').innerHTML = `${kartaSald(d.salda)}${blokZadan(d.zadania)}
-      ${kartaStanu(d)}
-      <div class="fresh"><span>Dane z banku: ${esc(d.daneZ || '—')}</span><button class="b-soft" id="odswiez" type="button">Odśwież</button></div>
-
-      ${blokZ(Z)}
-      ${blokY(Y)}
-      ${blokX(X)}
-
-      <p class="legend"><span class="chip c-mint">Podstawa</span> <span class="chip c-sky">Wybór</span> <span class="chip c-peach">Do przyjrzenia się</span></p>
-      <p class="s" id="zapisy" role="status">${wTle ? 'Zapisuję w arkuszu…' : ''}</p>
+    const d = dane, o = d.okres;
+    const stopka = `<p class="s" id="zapisy" role="status">${wTle ? 'Zapisuję w arkuszu…' : ''}</p>
       <div class="stopka"><span>${esc(d.email)} · ${tryb()} · wersja ${WERSJA}</span><button class="b-ghost" id="wyloguj" type="button">Wyloguj</button></div>`;
+    const swiezosc = `<div class="fresh"><span>Dane z banku: ${esc(d.daneZ || '—')}</span><button class="b-soft" id="odswiez" type="button">Odśwież</button></div>`;
+    if (widok === 'plan' && d.plan) {
+      const p = d.plan[planWidok];
+      $('#tytul').textContent = 'Plan'; $('#podtytul').textContent = p.nazwa + ' · ' + p.od + ' – ' + p.do;
+      $('#tresc').innerHTML = ekranPlanu(d) + stopka;
+    } else if (widok === 'wydatki') {
+      $('#tytul').textContent = 'Wydatki'; $('#podtytul').textContent = o.nazwa + ' · ' + o.od + ' – ' + o.do + ' · na życie (bez stałych)';
+      $('#tresc').innerHTML = ekranWydatkow(d) + swiezosc + stopka;
+    } else {
+      widok = 'miesiac';
+      $('#tytul').textContent = o.nazwa.charAt(0).toUpperCase() + o.nazwa.slice(1);
+      $('#podtytul').textContent = o.od + ' – ' + o.do + ' · dzień ' + o.dzien + ' z ' + o.dni;
+      $('#tresc').innerHTML = `${kartaSald(d.salda)}${blokZadan(d.zadania)}${kartaStanu(d)}${swiezosc}${blokY(d.Y)}${blokX(d.X)}` + stopka;
+    }
+    pasekZakladek();
+  }
+  function ekranWydatkow(d) {
+    const Z = d.Z, s = stanZmiennych(d);
+    const w = Z.grupy.map((g, i) => `<div class="row tap" data-z="${i}" role="button" tabindex="0">
+        <span class="pz ${POZ[g.poz] || ''}"></span>
+        <div class="main"><div class="t">${esc(krotko(g.rodz))}</div><div class="s">${esc(g.rodz.split(' / ')[0])} · ${ile(g.tx.length, 'płatność', 'płatności', 'płatności')}${g.paragony ? ' · z paragonami' : ''}</div></div>
+        <span class="num">${zl(g.suma)}</span></div>`).join('') || '<div class="row"><div class="main s">Brak wydatków.</div></div>';
+    return `<div class="sec"><span>Wydane na życie</span><span class="num">${zl(Z.suma)}</span></div><div class="list">${w}</div>
+      <p class="s" style="margin:10px 4px">zwykle w miesiącu ${zl(Z.srednia12)} · ${s.zostalo >= 0 ? 'na życie zostało ' + zl(s.zostalo) : 'ponad plan o ' + zl(-s.zostalo)}</p>
+      <p class="legend"><span class="chip c-mint">Podstawa</span> <span class="chip c-sky">Wybór</span> <span class="chip c-peach">Do przyjrzenia się</span></p>`;
   }
 
   // ---------- bloki (zwinięte na start; dotknięcie nagłówka rozwija) ----------
@@ -283,61 +305,70 @@
   }
   function kartaStanu(d) {
     const s = stanZmiennych(d), o = d.okres, f = s.budzet > 0 ? Math.min(d.Z.suma / s.budzet, 1) : 1, t = o.dzien / o.dni;
-    return `<div class="stan ${s.st[1]} tap" data-plan="1" role="button" tabindex="0">
-      <div class="stan-g"><span class="stan-chip">${s.st[0]}</span><span class="l">na zmienne do ${esc(o.do)}</span></div>
+    return `<div class="stan ${s.st[1]} tap" data-widok="plan" role="button" tabindex="0">
+      <div class="stan-g"><span class="stan-chip">${s.st[0]}</span><span class="l">na życie do ${esc(o.do)}</span></div>
       <div class="v num">${s.zostalo >= 0 ? 'Zostało ' + zl(s.zostalo) : 'Ponad plan o ' + zl(-s.zostalo)}</div>
       <div class="bar" aria-hidden="true"><span style="width:${(f * 100).toFixed(1)}%"></span><i style="left:${(t * 100).toFixed(1)}%"></i></div>
       <div class="l num">wydane ${zl(d.Z.suma)} z ${zl(s.budzet)}${s.zostalo > 0 ? ' · ok. ' + zl(s.dziennie) + ' na dzień' : ''}</div>
-      <div class="stan-d"><span class="l">${s.zPlanu ? 'budżet z planu miesiąca' : 'względem średniej z 12 miesięcy'} · w tym tempie ${zl(s.tempo)}</span><span class="stan-plan">Plan miesiąca ›</span></div></div>`;
+      <div class="stan-d"><span class="l">${s.zPlanu ? 'z planu' : 'względem średniej z 12 miesięcy'} · w tym tempie ${zl(s.tempo)}</span><span class="stan-plan">Plan ›</span></div></div>`;
   }
 
   // ---------- plan miesiąca (15.10): X − Y − A − jednorazowe = Z na zmienne; A i jednorazowe wpisywane tutaj ----------
   let plan = null;                                          // { m: 'biezacy'|'nastepny', A, J: [{nazwa, kwota}], zmienione, zapis }
   const liczba = t => { const n = Number(String(t || '').replace(/[\s ]/g, '').replace(',', '.')); return isFinite(n) ? Math.round(n * 100) / 100 : NaN; };
-  function kartaPlanu(P) {
-    if (!P) return '';
-    const p = P.biezacy;
-    return `<div class="blok"><div class="row tap glowa" data-plan="1" role="button" tabindex="0">
-      <div class="main"><div class="t b">Plan miesiąca</div><div class="s">na zmienne · średnio ${zl(p.srednia12)}</div></div>
-      <span class="num b">${zl(p.Z)}</span><span class="chev" aria-hidden="true"></span></div></div>`;
+  // Plan = odpowiedź na „czy nam starczy?”: wpłynie − musi zejść = na życie; porównanie z tym, ile zwykle wydajemy. Kwoty do 100 zł.
+  const ok100 = n => '~' + Math.abs(Math.round(n / 100) * 100).toLocaleString('pl-PL').replace(/\s/g, ' ') + ' zł';
+  function werdykt(naZycie, zwykle) { const r = naZycie - zwykle;
+    return r >= 0 ? { t: 'Starczy', kl: 'ok', zd: 'zostanie ' + ok100(r) } : { t: 'Zabraknie', kl: 'zle', zd: 'brakuje ' + ok100(-r) }; }
+  function ekranPlanu(d) {
+    const P = d.plan, p = P[planWidok], musi = p.Y + p.A + p.J, w = werdykt(p.Z, p.srednia12);
+    const wiersz = (t, s, k, kl) => `<div class="row${kl ? ' ' + kl : ''}"><div class="main"><div class="t">${t}</div>${s ? `<div class="s">${s}</div>` : ''}</div><span class="num">${k}</span></div>`;
+    const pole = (t, kw, s) => wiersz(esc(t), s ? esc(s) : '', kw);
+    const szcz = p.wplywy.map(x => pole(x.nazwa, zl(x.kwota), x.okazjonalny ? 'już wpłynął' : 'wpływ')).join('') +
+      pole('Stałe (rachunki, raty, subskrypcje)', zl(p.Y), 'musi zejść') + pole('Na oszczędności', zl(p.A), 'musi zejść') +
+      p.jednorazowe.map(x => pole(x.nazwa, zl(x.kwota), 'zaplanowane – musi zejść')).join('') +
+      pole('Zwykle na życie', zl(p.srednia12), 'średnio z 12 miesięcy') + pole('Poprzedni miesiąc na życie', zl(p.poprzedni), '') +
+      (p.wydaneZ != null ? pole('Wydane na życie do dziś', zl(p.wydaneZ), '') : '') +
+      pole('Ile musimy (Podstawa)', zl(p.musimy.razem), 'stałe ' + kw(p.musimy.stale) + ' + życie ' + kw(p.musimy.zmienne) + ' zł');
+    return `<div class="seg" role="tablist">${['biezacy', 'nastepny'].map(m => `<button type="button" role="tab" data-pm="${m}" aria-selected="${planWidok === m}" class="${planWidok === m ? 'on' : ''}">${esc(P[m].nazwa)}</button>`).join('')}</div>
+      <div class="werdykt ${w.kl}"><div class="werdykt-t">${w.t}</div><div class="werdykt-s">${esc(p.nazwa.split(' ')[0])}: ${w.zd}</div></div>
+      <div class="list" style="margin-top:12px">
+        ${wiersz('Wpłynie', '', ok100(p.X))}
+        ${wiersz('Musi zejść', 'stałe, oszczędności, zaplanowane', '− ' + ok100(musi))}
+        ${wiersz('<b>Zostaje na życie</b>', '', '<b>' + (p.Z < 0 ? '− ' : '') + ok100(p.Z) + '</b>', 'suma')}
+        ${wiersz('Zwykle wydajemy na życie', 'średnio z 12 miesięcy', ok100(p.srednia12))}
+      </div>
+      <button class="b-soft big" data-plan="1" type="button">Zmień plan</button>
+      ${blok('pdet', 'Szczegóły', 'skąd te liczby', '', szcz)}`;
   }
   function planStart(m) {
+    m = m || planWidok;
     const p = dane.plan[m];
     plan = { m: m, A: p.A, J: p.jednorazowe.map(x => ({ nazwa: x.nazwa, kwota: x.kwota })), zmienione: false, zapis: false };
   }
   function planZ() { const p = dane.plan[plan.m]; return Math.round((p.X - p.Y - plan.A - plan.J.reduce((s, x) => s + x.kwota, 0)) * 100) / 100; }
   function oknoPlanu() {
-    if (!plan) planStart('biezacy');
-    const P = dane.plan, p = P[plan.m], Z = planZ(), luka = Math.round((p.srednia12 - Z) * 100) / 100;
-    const pole = (t, kw, s) => `<div class="row"><div class="main"><div class="t">${t}</div>${s ? `<div class="s">${s}</div>` : ''}</div><span class="num">${kw}</span></div>`;
-    const wpl = p.wplywy.map(x => pole(esc(x.nazwa), zl(x.kwota), x.okazjonalny ? 'okazjonalny – już wpłynął' : '')).join('');
+    if (!plan) planStart();
+    const P = dane.plan, p = P[plan.m], Z = planZ(), w = werdykt(Z, p.srednia12);
     const jedn = plan.J.map((x, i) => `<div class="row"><div class="main"><div class="t">${esc(x.nazwa)}</div></div><span class="num">${zl(x.kwota)}</span>
         <button class="b-ghost usun" data-pj-usun="${i}" type="button" aria-label="Usuń ${esc(x.nazwa)}">✕</button></div>`).join('');
-    $('#sheet').innerHTML = `<div class="sheet-bg" id="bg"><div class="sheet" role="dialog" aria-label="Plan miesiąca">
+    $('#sheet').innerHTML = `<div class="sheet-bg" id="bg"><div class="sheet" role="dialog" aria-label="Zmień plan">
       <div class="grab"></div>
-      <div class="seg" role="tablist">${['biezacy', 'nastepny'].map(m => `<button type="button" role="tab" data-pm="${m}" aria-selected="${plan.m === m}" class="${plan.m === m ? 'on' : ''}">${esc(P[m].nazwa)}</button>`).join('')}</div>
-      <div class="sheet-head"><h2>Na zmienne</h2><span class="num" id="pZ">${zl(Z)}</span></div>
-      <div class="s">${esc(p.od)} – ${esc(p.do)} · wpływy − stałe − oszczędności − jednorazowe</div>
-      <div class="sec"><span>Wpływy</span><span class="num">${zl(p.X)}</span></div><div class="list">${wpl || pole('Brak wpływów stałych', '', '')}</div>
-      <div class="sec"><span>Stałe</span><span class="num">${zl(p.Y)}</span></div>
+      <div class="sheet-head"><h2>Zmień plan</h2><span class="s">${esc(p.nazwa)}</span></div>
+      <div class="werdykt ${w.kl} maly" id="pW"><div class="werdykt-t">${w.t}</div><div class="werdykt-s">na życie zostaje <span id="pZ">${ok100(Z)}</span> · zwykle ${ok100(p.srednia12)}</div></div>
       <div class="sec"><span>Oszczędności</span></div>
-      <div class="list"><label class="row"><div class="main"><div class="t">Na Oszczędnościowe</div></div>
+      <div class="list"><label class="row"><div class="main"><div class="t">Odkładamy w tym miesiącu</div><div class="s">0 – jeśli odkładamy to, co zostanie</div></div>
         <input class="kw" id="pA" inputmode="decimal" autocomplete="off" value="${kw(plan.A)}" aria-label="Kwota na oszczędności"><span class="s">zł</span></label></div>
-      <div class="sec"><span>Jednorazowe</span><span class="num">${zl(plan.J.reduce((s, x) => s + x.kwota, 0))}</span></div>
+      <div class="sec"><span>Zaplanowane wydatki jednorazowe</span><span class="num">${zl(plan.J.reduce((s, x) => s + x.kwota, 0))}</span></div>
       <div class="list">${jedn}<div class="row dodaj"><input id="pjN" maxlength="60" placeholder="Nazwa, np. prezent" autocomplete="off" aria-label="Nazwa wydatku jednorazowego">
         <input class="kw" id="pjK" inputmode="decimal" placeholder="0,00" autocomplete="off" aria-label="Kwota"><button class="b-soft" id="pjDodaj" type="button">Dodaj</button></div></div>
-      <div class="sec"><span>Porównanie</span></div>
-      <div class="list">${pole('Średnio na zmienne', zl(p.srednia12), '12 pełnych miesięcy')}${pole('Poprzedni miesiąc', zl(p.poprzedni), '')}${p.wydaneZ != null ? pole('Wydane do dziś', zl(p.wydaneZ), '') : ''}
-        ${pole(luka > 0 ? 'Brakuje do średniej' : 'Ponad średnią', `<span id="pL">${zl(Math.abs(luka))}</span>`, '')}</div>
-      <div class="sec"><span>Ile musimy</span><span class="num">${zl(p.musimy.razem)}</span></div>
-      <div class="list">${pole('Stałe – Podstawa', zl(p.musimy.stale), '')}${pole('Zmienne – Podstawa', zl(p.musimy.zmienne), 'średnio w miesiącu')}</div>
       <button class="b-soft big" id="pZapisz" type="button" ${plan.zmienione && !plan.zapis ? '' : 'disabled'}>${plan.zapis ? 'Zapisuję…' : plan.zmienione ? 'Zapisz plan' : 'Zapisane'}</button>
       <button class="b-ghost big" id="zamknij" type="button">Zamknij</button></div></div>`;
     bindSheet();
   }
   function planOdswiezLiczby() {
-    const Z = planZ(), p = dane.plan[plan.m], luka = Math.round((p.srednia12 - Z) * 100) / 100;
-    $('#pZ').textContent = zl(Z); $('#pL').textContent = zl(Math.abs(luka)); $('#pL').closest('.row').querySelector('.t').textContent = luka > 0 ? 'Brakuje do średniej' : 'Ponad średnią';
+    const Z = planZ(), p = dane.plan[plan.m], w = werdykt(Z, p.srednia12), el = $('#pW');
+    $('#pZ').textContent = ok100(Z); el.className = 'werdykt maly ' + w.kl; el.querySelector('.werdykt-t').textContent = w.t;
     const b = $('#pZapisz'); b.disabled = !plan.zmienione || plan.zapis; b.textContent = plan.zapis ? 'Zapisuję…' : plan.zmienione ? 'Zapisz plan' : 'Zapisane';
   }
   async function planZapisz() {
@@ -346,7 +377,7 @@
     let w = null;
     try { w = await api('plan-zapisz', { miesiac: dane.plan[plan.m].klucz, A: plan.A, jednorazowe: plan.J }); } catch (e) {}
     plan.zapis = false;
-    if (w && w.ok) { const m = plan.m; dane = w; planStart(m); rysuj(); oknoPlanu(); toast('Plan zapisany'); }
+    if (w && w.ok) { dane = w; plan = null; zamknijWszystkie(); rysuj(); toast('Plan zapisany'); }
     else { planOdswiezLiczby(); toast(w ? 'Nie udało się: ' + (w.blad || 'błąd') : 'Brak połączenia – nie zapisano'); }
   }
   function confirmPlan() {
@@ -396,13 +427,15 @@
     const b = e.target.closest('[data-blok]'), sl = e.target.closest('[data-saldo]'), od = e.target.closest('[data-odhacz]');
     const pl = e.target.closest('[data-plan]'), pm = e.target.closest('[data-pm]'), pu = e.target.closest('[data-pj-usun]');
     const tx = e.target.closest('[data-tx]'), zt = e.target.closest('[data-zt]'), pz = e.target.closest('[data-poz]'), cf = e.target.closest('[data-cofnij]');
-    if (cf) { const i = dane.zadania.findIndex(z => z.klucz === cf.dataset.cofnij); $('#toast').innerHTML = ''; if (i >= 0) odhaczCofnij(i); }
+    const wd = e.target.closest('[data-widok]');
+    if (wd) { widok = wd.dataset.widok; zamknijWszystkie(); rysuj(); scrollTo(0, 0); }
+    else if (cf) { const i = dane.zadania.findIndex(z => z.klucz === cf.dataset.cofnij); $('#toast').innerHTML = ''; if (i >= 0) odhaczCofnij(i); }
     else if (tx) { const id = tx.dataset.tx; otworz(() => oknoPoprawki(id)); }
     else if (zt) { zakladkaZ = zt.dataset.zt; oknoZ(+zt.dataset.zi); }
     else if (pz) { if (!pz.classList.contains('on')) { pz.parentNode.querySelectorAll('button').forEach(x => x.disabled = true); zapiszPoziom(pz.dataset.rodz, pz.dataset.poz); } }
     else if (e.target.id === 'prZapisz') zapiszPoprawke(e.target.dataset.id);
     else if (pl) { plan = null; otworz(() => oknoPlanu()); }
-    else if (pm) { if (pm.dataset.pm !== plan.m) { if (plan.zmienione && !confirmPlan()) return; planStart(pm.dataset.pm); oknoPlanu(); } }
+    else if (pm) { planWidok = pm.dataset.pm; rysuj(); }
     else if (pu) { plan.J.splice(+pu.dataset.pjUsun, 1); plan.zmienione = true; oknoPlanu(); }
     else if (e.target.id === 'pjDodaj') {
       const n = $('#pjN').value.replace(/\s+/g, ' ').trim(), k = liczba($('#pjK').value);
@@ -420,7 +453,7 @@
     else if (e.target.id === 'odswiez') { e.target.disabled = true; e.target.textContent = 'Liczę…'; wczytaj(true).then(() => dane && toast('Odświeżone')); }
     else if (e.target.id === 'wyloguj') wyloguj();
   });
-  document.addEventListener('keydown', e => { const r = e.target.closest('[data-z],[data-y],[data-x],[data-blok],[data-saldo],[data-plan],[data-tx]'); if (r && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); r.click(); } });
+  document.addEventListener('keydown', e => { const r = e.target.closest('[data-z],[data-y],[data-x],[data-blok],[data-saldo],[data-plan],[data-tx],[data-widok]'); if (r && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); r.click(); } });
 
   function tryb() {
     const app = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
