@@ -1,4 +1,4 @@
-// Nasz budżet – v17 (15.10 wieczór: trzy zakładki Miesiąc / Plan / Wydatki; plan jako „czy nam starczy?” w zaokrągleniu do 100 zł; v16 15.10: jasny stan zmiennych zamiast koła; zapisy w tle bez czekania; odhaczone znikają z „Do zrobienia”; v15 15.10 popołudnie: poprawki rodzaju / „czego dotyczy” / poziomu z telefonu, „Z paragonów”; v14 15.10: plan miesiąca – X / Y / A / jednorazowe / Z, „ile MUSIMY”, zapis z telefonu; v13 14.10: najem na czysto – koszty mieszkania odjęte od najmu, nie ma ich w „Stałe”; v12: kwoty z groszami; v11: rata pokryta saldem konta do rat = zapłacona; v10: przepustka na 30 dni – logowanie raz na miesiąc; v9: aplikacja = podsumowanie; jeden blok „Stałe”, szczegóły płatności: tytuł i konto): ekran „Ten miesiąc” – salda na górze, bloki zwinięte, stałe: do zapłacenia / schodzą same,
+// Nasz budżet – v18 (15.10: „zwykle” = mediana 12 mies.; stan i plan mówią to samo (prognoza w tym tempie); wpłynęło / wpłynie; v17 15.10 wieczór: trzy zakładki Miesiąc / Plan / Wydatki; plan jako „czy nam starczy?” w zaokrągleniu do 100 zł; v16 15.10: jasny stan zmiennych zamiast koła; zapisy w tle bez czekania; odhaczone znikają z „Do zrobienia”; v15 15.10 popołudnie: poprawki rodzaju / „czego dotyczy” / poziomu z telefonu, „Z paragonów”; v14 15.10: plan miesiąca – X / Y / A / jednorazowe / Z, „ile MUSIMY”, zapis z telefonu; v13 14.10: najem na czysto – koszty mieszkania odjęte od najmu, nie ma ich w „Stałe”; v12: kwoty z groszami; v11: rata pokryta saldem konta do rat = zapłacona; v10: przepustka na 30 dni – logowanie raz na miesiąc; v9: aplikacja = podsumowanie; jeden blok „Stałe”, szczegóły płatności: tytuł i konto): ekran „Ten miesiąc” – salda na górze, bloki zwinięte, stałe: do zapłacenia / schodzą same,
 // wpływy: stałe / okazjonalne (zwroty nie są wpływem – zmniejszają wydatek w swoim rodzaju).
 // Dane trzymamy wyłącznie w pamięci strony – po zamknięciu znikają. W telefonie zapisujemy TYLKO przepustkę od bramy
 // (losowy klucz, ważny 30 dni, bez żadnych danych; „Wyloguj” ją kasuje także w bramie).
@@ -7,7 +7,7 @@
   'use strict';
   const CFG = window.NB_CONFIG;
   let bilet = null, przepustka = null, dane = null, czekanie = null, googleGotowe = false;
-  const WERSJA = 17;
+  const WERSJA = 18;
   let widok = 'miesiac', planWidok = 'biezacy';            // 15.10 (v17): zakładka i miesiąc planu (tylko w pamięci strony)
   const KLUCZ_PRZEPUSTKI = 'nb_przepustka';
   const otwarte = {};                                   // wszystkie bloki zwinięte na start (G 14.10)
@@ -111,7 +111,7 @@
         <div class="main"><div class="t">${esc(krotko(g.rodz))}</div><div class="s">${esc(g.rodz.split(' / ')[0])} · ${ile(g.tx.length, 'płatność', 'płatności', 'płatności')}${g.paragony ? ' · z paragonami' : ''}</div></div>
         <span class="num">${zl(g.suma)}</span></div>`).join('') || '<div class="row"><div class="main s">Brak wydatków.</div></div>';
     return `<div class="sec"><span>Wydane na życie</span><span class="num">${zl(Z.suma)}</span></div><div class="list">${w}</div>
-      <p class="s" style="margin:10px 4px">zwykle w miesiącu ${zl(Z.srednia12)} · ${s.zostalo >= 0 ? 'na życie zostało ' + zl(s.zostalo) : 'ponad plan o ' + zl(-s.zostalo)}</p>
+      <p class="s" style="margin:10px 4px">zwykle w miesiącu ${zl(d.plan ? d.plan.biezacy.zwykle || Z.srednia12 : Z.srednia12)} · ${s.zostalo >= 0 ? 'na życie zostało ' + zl(s.zostalo) : 'ponad plan o ' + zl(-s.zostalo)}</p>
       <p class="legend"><span class="chip c-mint">Podstawa</span> <span class="chip c-sky">Wybór</span> <span class="chip c-peach">Do przyjrzenia się</span></p>`;
   }
 
@@ -300,17 +300,18 @@
   function stanZmiennych(d) {
     const o = d.okres, Z = d.Z, p = d.plan && d.plan.biezacy, budzet = p ? p.Z : Z.srednia12;
     const tempo = o.dzien ? Z.suma / o.dzien * o.dni : 0, zostalo = budzet - Z.suma, dni = Math.max(1, o.dni - o.dzien + 1);
-    const st = Z.suma > budzet ? ['Ponad plan', 'zle'] : tempo > budzet * 1.05 ? ['Na granicy', 'uwaga'] : ['W planie', 'ok'];
-    return { budzet: budzet, zostalo: zostalo, dziennie: zostalo / dni, tempo: tempo, st: st, zPlanu: !!p };
+    // 15.10 (v18): status = prognoza do końca okresu (jak w planie): w tym tempie zabraknie > 5% → „Ponad plan”, 0–5% → „Na granicy”.
+    const st = Z.suma > budzet || tempo > budzet * 1.05 ? ['Ponad plan', 'zle'] : tempo > budzet ? ['Na granicy', 'uwaga'] : ['W planie', 'ok'];
+    return { budzet: budzet, zostalo: zostalo, dziennie: zostalo / dni, tempo: tempo, brak: tempo - budzet, st: st, zPlanu: !!p };
   }
   function kartaStanu(d) {
     const s = stanZmiennych(d), o = d.okres, f = s.budzet > 0 ? Math.min(d.Z.suma / s.budzet, 1) : 1, t = o.dzien / o.dni;
     return `<div class="stan ${s.st[1]} tap" data-widok="plan" role="button" tabindex="0">
       <div class="stan-g"><span class="stan-chip">${s.st[0]}</span><span class="l">na życie do ${esc(o.do)}</span></div>
-      <div class="v num">${s.zostalo >= 0 ? 'Zostało ' + zl(s.zostalo) : 'Ponad plan o ' + zl(-s.zostalo)}</div>
+      <div class="v num">${s.brak > 0 ? 'W tym tempie zabraknie ' + ok100(s.brak) : 'Zostało ' + zl(s.zostalo)}</div>
       <div class="bar" aria-hidden="true"><span style="width:${(f * 100).toFixed(1)}%"></span><i style="left:${(t * 100).toFixed(1)}%"></i></div>
-      <div class="l num">wydane ${zl(d.Z.suma)} z ${zl(s.budzet)}${s.zostalo > 0 ? ' · ok. ' + zl(s.dziennie) + ' na dzień' : ''}</div>
-      <div class="stan-d"><span class="l">${s.zPlanu ? 'z planu' : 'względem średniej z 12 miesięcy'} · w tym tempie ${zl(s.tempo)}</span><span class="stan-plan">Plan ›</span></div></div>`;
+      <div class="l num">wydane ${zl(d.Z.suma)} z ${zl(s.budzet)} · ${s.zostalo > 0 ? 'zostało ' + zl(s.zostalo) + ', ok. ' + zl(s.dziennie) + ' na dzień' : 'ponad plan o ' + zl(-s.zostalo)}</div>
+      <div class="stan-d"><span class="l">w tym tempie wydacie na życie ${ok100(s.tempo)}</span><span class="stan-plan">Plan ›</span></div></div>`;
   }
 
   // ---------- plan miesiąca (15.10): X − Y − A − jednorazowe = Z na zmienne; A i jednorazowe wpisywane tutaj ----------
@@ -321,13 +322,13 @@
   function werdykt(naZycie, zwykle) { const r = naZycie - zwykle;
     return r >= 0 ? { t: 'Starczy', kl: 'ok', zd: 'zostanie ' + ok100(r) } : { t: 'Zabraknie', kl: 'zle', zd: 'brakuje ' + ok100(-r) }; }
   function ekranPlanu(d) {
-    const P = d.plan, p = P[planWidok], musi = p.Y + p.A + p.J, w = werdykt(p.Z, p.srednia12);
+    const P = d.plan, p = P[planWidok], musi = p.Y + p.A + p.J, zw = p.zwykle || p.srednia12, w = werdykt(p.Z, zw);
     const wiersz = (t, s, k, kl) => `<div class="row${kl ? ' ' + kl : ''}"><div class="main"><div class="t">${t}</div>${s ? `<div class="s">${s}</div>` : ''}</div><span class="num">${k}</span></div>`;
     const pole = (t, kw, s) => wiersz(esc(t), s ? esc(s) : '', kw);
-    const szcz = p.wplywy.map(x => pole(x.nazwa, zl(x.kwota), x.okazjonalny ? 'już wpłynął' : 'wpływ')).join('') +
+    const szcz = p.wplywy.map(x => pole(x.nazwa, zl(x.kwota), (x.wplynelo ? 'wpłynęło' : 'wpłynie') + (x.okazjonalny ? ' · okazjonalnie' : ''))).join('') +
       pole('Stałe (rachunki, raty, subskrypcje)', zl(p.Y), 'musi zejść') + pole('Na oszczędności', zl(p.A), 'musi zejść') +
       p.jednorazowe.map(x => pole(x.nazwa, zl(x.kwota), 'zaplanowane – musi zejść')).join('') +
-      pole('Zwykle na życie', zl(p.srednia12), 'średnio z 12 miesięcy') + pole('Poprzedni miesiąc na życie', zl(p.poprzedni), '') +
+      pole('Zwykle na życie', zl(zw), 'typowy miesiąc z ostatnich 12 (mediana)') + pole('Średnio na życie', zl(p.srednia12), 'z jednorazowymi dużymi wydatkami') + pole('Poprzedni miesiąc na życie', zl(p.poprzedni), '') +
       (p.wydaneZ != null ? pole('Wydane na życie do dziś', zl(p.wydaneZ), '') : '') +
       pole('Ile musimy (Podstawa)', zl(p.musimy.razem), 'stałe ' + kw(p.musimy.stale) + ' + życie ' + kw(p.musimy.zmienne) + ' zł');
     return `<div class="seg" role="tablist">${['biezacy', 'nastepny'].map(m => `<button type="button" role="tab" data-pm="${m}" aria-selected="${planWidok === m}" class="${planWidok === m ? 'on' : ''}">${esc(P[m].nazwa)}</button>`).join('')}</div>
@@ -336,7 +337,7 @@
         ${wiersz('Wpłynie', '', ok100(p.X))}
         ${wiersz('Musi zejść', 'stałe, oszczędności, zaplanowane', ok100(musi))}
         ${wiersz('<b>Zostaje na życie</b>', '', '<b>' + (p.Z < 0 ? '− ' : '') + ok100(p.Z) + '</b>', 'suma')}
-        ${wiersz('Zwykle wydajemy na życie', 'średnio z 12 miesięcy', ok100(p.srednia12))}
+        ${wiersz('Zwykle wydajemy na życie', 'typowy miesiąc z ostatnich 12', ok100(zw))}
       </div>
       <button class="b-soft big" data-plan="1" type="button">Zmień plan</button>
       ${blok('pdet', 'Szczegóły', 'skąd te liczby', '', szcz)}`;
@@ -349,13 +350,13 @@
   function planZ() { const p = dane.plan[plan.m]; return Math.round((p.X - p.Y - plan.A - plan.J.reduce((s, x) => s + x.kwota, 0)) * 100) / 100; }
   function oknoPlanu() {
     if (!plan) planStart();
-    const P = dane.plan, p = P[plan.m], Z = planZ(), w = werdykt(Z, p.srednia12);
+    const P = dane.plan, p = P[plan.m], Z = planZ(), w = werdykt(Z, p.zwykle || p.srednia12);
     const jedn = plan.J.map((x, i) => `<div class="row"><div class="main"><div class="t">${esc(x.nazwa)}</div></div><span class="num">${zl(x.kwota)}</span>
         <button class="b-ghost usun" data-pj-usun="${i}" type="button" aria-label="Usuń ${esc(x.nazwa)}">✕</button></div>`).join('');
     $('#sheet').innerHTML = `<div class="sheet-bg" id="bg"><div class="sheet" role="dialog" aria-label="Zmień plan">
       <div class="grab"></div>
       <div class="sheet-head"><h2>Zmień plan</h2><span class="s">${esc(p.nazwa)}</span></div>
-      <div class="werdykt ${w.kl} maly" id="pW"><div class="werdykt-t">${w.t}</div><div class="werdykt-s">na życie zostaje <span id="pZ">${ok100(Z)}</span> · zwykle ${ok100(p.srednia12)}</div></div>
+      <div class="werdykt ${w.kl} maly" id="pW"><div class="werdykt-t">${w.t}</div><div class="werdykt-s">na życie zostaje <span id="pZ">${ok100(Z)}</span> · zwykle ${ok100(p.zwykle || p.srednia12)}</div></div>
       <div class="sec"><span>Oszczędności</span></div>
       <div class="list"><label class="row"><div class="main"><div class="t">Odkładamy</div><div class="s">0 – jeśli odkładamy to, co zostanie</div></div>
         <input class="kw" id="pA" inputmode="decimal" autocomplete="off" value="${kw(plan.A)}" aria-label="Kwota na oszczędności"><span class="s">zł</span></label></div>
@@ -367,7 +368,7 @@
     bindSheet();
   }
   function planOdswiezLiczby() {
-    const Z = planZ(), p = dane.plan[plan.m], w = werdykt(Z, p.srednia12), el = $('#pW');
+    const Z = planZ(), p = dane.plan[plan.m], w = werdykt(Z, p.zwykle || p.srednia12), el = $('#pW');
     $('#pZ').textContent = ok100(Z); el.className = 'werdykt maly ' + w.kl; el.querySelector('.werdykt-t').textContent = w.t;
     const b = $('#pZapisz'); b.disabled = !plan.zmienione || plan.zapis; b.textContent = plan.zapis ? 'Zapisuję…' : plan.zmienione ? 'Zapisz plan' : 'Zapisane';
   }
