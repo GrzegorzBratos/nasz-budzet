@@ -317,7 +317,7 @@
   let plan = null;                                          // { m: 'biezacy'|'nastepny', A, J: [{nazwa, kwota}], zmienione, zapis }
   const liczba = t => { const n = Number(String(t || '').replace(/[\s ]/g, '').replace(',', '.')); return isFinite(n) ? Math.round(n * 100) / 100 : NaN; };
   // Plan = odpowiedź na „czy nam starczy?”: wpłynie − musi zejść = na życie; porównanie z tym, ile zwykle wydajemy. Kwoty do 100 zł.
-  const ok100 = n => '~' + Math.abs(Math.round(n / 100) * 100).toLocaleString('pl-PL').replace(/\s/g, ' ') + ' zł';
+  const ok100 = n => '~' + String(Math.abs(Math.round(n / 100) * 100)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0') + '\u00a0zł';
   function werdykt(naZycie, zwykle) { const r = naZycie - zwykle;
     return r >= 0 ? { t: 'Starczy', kl: 'ok', zd: 'zostanie ' + ok100(r) } : { t: 'Zabraknie', kl: 'zle', zd: 'brakuje ' + ok100(-r) }; }
   function ekranPlanu(d) {
@@ -334,7 +334,7 @@
       <div class="werdykt ${w.kl}"><div class="werdykt-t">${w.t}</div><div class="werdykt-s">${esc(p.nazwa.split(' ')[0])}: ${w.zd}</div></div>
       <div class="list" style="margin-top:12px">
         ${wiersz('Wpłynie', '', ok100(p.X))}
-        ${wiersz('Musi zejść', 'stałe, oszczędności, zaplanowane', '− ' + ok100(musi))}
+        ${wiersz('Musi zejść', 'stałe, oszczędności, zaplanowane', ok100(musi))}
         ${wiersz('<b>Zostaje na życie</b>', '', '<b>' + (p.Z < 0 ? '− ' : '') + ok100(p.Z) + '</b>', 'suma')}
         ${wiersz('Zwykle wydajemy na życie', 'średnio z 12 miesięcy', ok100(p.srednia12))}
       </div>
@@ -357,7 +357,7 @@
       <div class="sheet-head"><h2>Zmień plan</h2><span class="s">${esc(p.nazwa)}</span></div>
       <div class="werdykt ${w.kl} maly" id="pW"><div class="werdykt-t">${w.t}</div><div class="werdykt-s">na życie zostaje <span id="pZ">${ok100(Z)}</span> · zwykle ${ok100(p.srednia12)}</div></div>
       <div class="sec"><span>Oszczędności</span></div>
-      <div class="list"><label class="row"><div class="main"><div class="t">Odkładamy w tym miesiącu</div><div class="s">0 – jeśli odkładamy to, co zostanie</div></div>
+      <div class="list"><label class="row"><div class="main"><div class="t">Odkładamy</div><div class="s">0 – jeśli odkładamy to, co zostanie</div></div>
         <input class="kw" id="pA" inputmode="decimal" autocomplete="off" value="${kw(plan.A)}" aria-label="Kwota na oszczędności"><span class="s">zł</span></label></div>
       <div class="sec"><span>Zaplanowane wydatki jednorazowe</span><span class="num">${zl(plan.J.reduce((s, x) => s + x.kwota, 0))}</span></div>
       <div class="list">${jedn}<div class="row dodaj"><input id="pjN" maxlength="60" placeholder="Nazwa, np. prezent" autocomplete="off" aria-label="Nazwa wydatku jednorazowego">
