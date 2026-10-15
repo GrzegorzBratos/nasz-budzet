@@ -1,4 +1,4 @@
-// Nasz budżet – v15 (15.10 popołudnie: poprawki rodzaju / „czego dotyczy” / poziomu z telefonu, „Z paragonów”; v14 15.10: plan miesiąca – X / Y / A / jednorazowe / Z, „ile MUSIMY”, zapis z telefonu; v13 14.10: najem na czysto – koszty mieszkania odjęte od najmu, nie ma ich w „Stałe”; v12: kwoty z groszami; v11: rata pokryta saldem konta do rat = zapłacona; v10: przepustka na 30 dni – logowanie raz na miesiąc; v9: aplikacja = podsumowanie; jeden blok „Stałe”, szczegóły płatności: tytuł i konto): ekran „Ten miesiąc” – salda na górze, bloki zwinięte, stałe: do zapłacenia / schodzą same,
+// Nasz budżet – v16 (15.10: jasny stan zmiennych zamiast koła; zapisy w tle bez czekania; odhaczone znikają z „Do zrobienia”; v15 15.10 popołudnie: poprawki rodzaju / „czego dotyczy” / poziomu z telefonu, „Z paragonów”; v14 15.10: plan miesiąca – X / Y / A / jednorazowe / Z, „ile MUSIMY”, zapis z telefonu; v13 14.10: najem na czysto – koszty mieszkania odjęte od najmu, nie ma ich w „Stałe”; v12: kwoty z groszami; v11: rata pokryta saldem konta do rat = zapłacona; v10: przepustka na 30 dni – logowanie raz na miesiąc; v9: aplikacja = podsumowanie; jeden blok „Stałe”, szczegóły płatności: tytuł i konto): ekran „Ten miesiąc” – salda na górze, bloki zwinięte, stałe: do zapłacenia / schodzą same,
 // wpływy: stałe / okazjonalne (zwroty nie są wpływem – zmniejszają wydatek w swoim rodzaju).
 // Dane trzymamy wyłącznie w pamięci strony – po zamknięciu znikają. W telefonie zapisujemy TYLKO przepustkę od bramy
 // (losowy klucz, ważny 30 dni, bez żadnych danych; „Wyloguj” ją kasuje także w bramie).
@@ -7,7 +7,7 @@
   'use strict';
   const CFG = window.NB_CONFIG;
   let bilet = null, przepustka = null, dane = null, czekanie = null, googleGotowe = false;
-  const WERSJA = 15;
+  const WERSJA = 16;
   const KLUCZ_PRZEPUSTKI = 'nb_przepustka';
   const otwarte = {};                                   // wszystkie bloki zwinięte na start (G 14.10)
   const wToku = {};                                     // odhaczenia wysłane do bramy, jeszcze bez odpowiedzi: klucz → docelowy stan                                   // które bloki rozwinięte (tylko w pamięci, do zamknięcia aplikacji)
@@ -20,6 +20,10 @@
   const krotko = r => String(r || '').split(' / ').slice(1).join(' / ') || r;
 
   function stan(tekst, rodzaj) { const el = $('#stan'); el.textContent = tekst || ''; el.dataset.rodzaj = rodzaj || ''; }
+  function toastCofnij(t, klucz) {
+    const el = $('#toast'); el.innerHTML = '<div class="toast" role="status">' + esc(t) + ' <button class="b-toast" type="button" data-cofnij="' + esc(klucz) + '">Cofnij</button></div>';
+    clearTimeout(toast.h); toast.h = setTimeout(() => el.innerHTML = '', 5000);
+  }
   function toast(t) { const el = $('#toast'); el.innerHTML = '<div class="toast" role="status">' + esc(t) + '</div>'; clearTimeout(toast.h); toast.h = setTimeout(() => el.innerHTML = '', 2000); }
 
   async function api(akcja, dodatki) {
@@ -74,22 +78,10 @@
   // ---------- ekran „Ten miesiąc” ----------
   function rysuj() {
     const d = dane, o = d.okres, Z = d.Z, Y = d.Y, X = d.X;
-    const C = 2 * Math.PI * 46, f = Z.srednia12 ? Math.min(Z.suma / Z.srednia12, 1) : 0, t = o.dzien / o.dni;
-    const tempo = o.dzien ? Z.suma / o.dzien * o.dni : 0;
     $('#tytul').textContent = o.nazwa.charAt(0).toUpperCase() + o.nazwa.slice(1);
     $('#podtytul').textContent = o.od + ' – ' + o.do + ' · dzień ' + o.dzien + ' z ' + o.dni;
     $('#tresc').innerHTML = `${kartaSald(d.salda)}${blokZadan(d.zadania)}
-      <div class="hero">
-        <svg class="ring" viewBox="0 0 110 110" aria-hidden="true">
-          <circle cx="55" cy="55" r="46" fill="none" stroke="var(--line)" stroke-width="12"/>
-          <circle cx="55" cy="55" r="46" fill="none" stroke="${Z.suma > Z.srednia12 ? 'var(--rose-ink)' : 'var(--accent)'}" stroke-width="12" stroke-linecap="round" stroke-dasharray="${C * f} ${C}" transform="rotate(-90 55 55)"/>
-          <line x1="55" y1="4" x2="55" y2="16" stroke="var(--fg)" stroke-width="2" transform="rotate(${t * 360} 55 55)" opacity=".5"/>
-        </svg>
-        <div><div class="l">Zmienne w tym miesiącu</div><div class="v num">${zl(Z.suma)}</div>
-          <div class="l num">średnio w miesiącu ${zl(Z.srednia12)}</div>
-          <div class="l num">w tym tempie ${zl(tempo)}</div></div>
-      </div>
-      ${kartaPlanu(d.plan)}
+      ${kartaStanu(d)}
       <div class="fresh"><span>Dane z banku: ${esc(d.daneZ || '—')}</span><button class="b-soft" id="odswiez" type="button">Odśwież</button></div>
 
       ${blokZ(Z)}
@@ -97,6 +89,7 @@
       ${blokX(X)}
 
       <p class="legend"><span class="chip c-mint">Podstawa</span> <span class="chip c-sky">Wybór</span> <span class="chip c-peach">Do przyjrzenia się</span></p>
+      <p class="s" id="zapisy" role="status">${wTle ? 'Zapisuję w arkuszu…' : ''}</p>
       <div class="stopka"><span>${esc(d.email)} · ${tryb()} · wersja ${WERSJA}</span><button class="b-ghost" id="wyloguj" type="button">Wyloguj</button></div>`;
   }
 
@@ -127,7 +120,8 @@
   function blokZadan(L) {
     if (!L || !L.length) return '';
     const czeka = L.filter(z => z.stan === 'do zrobienia' || z.stan === 'sprawdź').length;
-    const w = L.map((z, i) => { const st = STAN[z.stan] || STAN['do zrobienia'];
+    if (!czeka) return '';                                       // 15.10: odhaczone znikają (widać je w „Stałe”), pusta lista – bez bloku
+    const w = L.map((z, i) => { if (z.stan !== 'do zrobienia' && z.stan !== 'sprawdź') return ''; const st = STAN[z.stan] || STAN['do zrobienia'];
       return `<div class="row${z.stan === 'odhaczone' || z.stan === 'potwierdzone' ? ' zrobione' : ''}">
         <button class="check ${st[0]}${wToku[z.klucz] ? ' trwa' : ''}" data-odhacz="${i}" type="button" aria-label="${z.stan === 'do zrobienia' ? 'Odhacz jako zrobione' : 'Cofnij odhaczenie'}" ${z.stan === 'potwierdzone' ? 'disabled' : ''}>${z.stan === 'do zrobienia' ? '' : z.stan === 'sprawdź' ? '!' : '✓'}</button>
         <div class="main"><div class="t">${esc(z.tytul)}</div><div class="s">${z.kwota ? 'ok. ' + zl(z.kwota) + ' · ' : ''}${z.termin ? 'termin ' + esc(z.termin) : ''}${st[1] ? ' · ' + esc(st[1]) : ''}${z.stan === 'potwierdzone' && z.opis ? ' · ' + esc(z.opis) : ''}</div></div></div>`; }).join('');
@@ -135,10 +129,12 @@
   }
   // Odhaczenie od razu na ekranie (bez czekania na bramę); zapis idzie w tle, kółko pulsuje do potwierdzenia.
   // Gdy brama odmówi albo nie ma sieci – stan wraca i pokazuje się komunikat.
+  async function odhaczCofnij(i) { const z = dane.zadania[i]; const go = () => { if (wToku[z.klucz]) return setTimeout(go, 300); if (z.stan === 'odhaczone') odhacz(i); }; go(); }
   async function odhacz(i) {
     const z = dane.zadania[i]; if (!z || z.stan === 'potwierdzone' || wToku[z.klucz]) return;
     const cofnij = z.stan !== 'do zrobienia', poprzedni = z.stan;
     z.stan = cofnij ? 'do zrobienia' : 'odhaczone'; wToku[z.klucz] = z.stan; rysuj();
+    if (!cofnij) toastCofnij('Odhaczone: ' + z.tytul.replace(/^[^:]+:\s*/, ''), z.klucz);
     let w = null;
     try { w = await api('odhacz', { klucz: z.klucz, cofnij: cofnij }); } catch (e) {}
     delete wToku[z.klucz];
@@ -226,18 +222,37 @@
       <button class="b-soft big" id="prZapisz" type="button" data-id="${esc(id)}">Zapisz</button>`);
   }
   function zamknijWszystkie() { stos.length = 0; $('#sheet').innerHTML = ''; }
-  async function zapiszPoprawke(id) {
-    const b = $('#prZapisz'); b.disabled = true; b.textContent = $('#prZ').checked ? 'Zapisuję i przeliczam…' : 'Zapisuję…';
-    let w = null;
-    try { w = await api('popraw', { id: id, rodzaj: $('#prR').value, czego: $('#prC').value, zawsze: $('#prZ').checked }); } catch (e) {}
-    if (w && w.ok) { dane = w; zamknijWszystkie(); rysuj(); toast(w.komunikat && w.komunikat.length < 90 ? w.komunikat : 'Zapisane'); if (w.komunikat && w.komunikat.length >= 90) stan(w.komunikat); }
-    else { b.disabled = false; b.textContent = 'Zapisz'; toast(w ? 'Nie udało się: ' + (w.blad || 'błąd') : 'Brak połączenia – nie zapisano'); }
+  // 15.10 (v16): zapis w tle – okno zamyka się od razu, ekran zmienia się od razu (na ile da się policzyć w telefonie),
+  // a gdy brama skończy (kilka sekund), dane przychodzą z arkusza. Zapisy idą po kolei (kolejka), nic nie blokuje ekranu.
+  let kolejka = Promise.resolve(), wTle = 0;
+  function wTleZapis(akcja, dodatki, poZapisie) {
+    wTle++; stanZapisu();
+    kolejka = kolejka.then(async () => {
+      let w = null; try { w = await api(akcja, dodatki); } catch (e) {}
+      wTle--;
+      if (w && w.ok) { dane = w; if (!stos.length) rysuj(); poZapisie && poZapisie(w); }
+      else { toast(w ? 'Nie zapisano: ' + (w.blad || 'błąd') : 'Brak połączenia – nie zapisano'); wczytaj(); }
+      stanZapisu();
+    });
   }
-  async function zapiszPoziom(rodz, poz) {
-    let w = null;
-    try { w = await api('poziom', { rodzaj: rodz, poziom: poz }); } catch (e) {}
-    if (w && w.ok) { dane = w; zamknijWszystkie(); rysuj(); toast('Poziom: ' + poz); }
-    else toast(w ? 'Nie udało się: ' + (w.blad || 'błąd') : 'Brak połączenia – nie zapisano');
+  function stanZapisu() { const el = $('#zapisy'); if (el) el.textContent = wTle ? 'Zapisuję w arkuszu…' : ''; }
+  function przeniesLokalnie(id, rodz, czego) {                  // natychmiastowy podgląd: płatność przechodzi do nowego rodzaju w „Zmiennych”
+    const G = dane.Z.grupy, zr = G.find(g => g.tx.some(t => String(t.id) === id)); if (!zr) return;
+    const t = zr.tx.find(x => String(x.id) === id); t.czego = czego; if (!rodz || rodz === zr.rodz) return;
+    zr.tx = zr.tx.filter(x => x !== t); zr.suma = Math.round((zr.suma - t.k) * 100) / 100; t.rodz = rodz;
+    let cel = G.find(g => g.rodz === rodz);
+    if (!cel) { const sl = (dane.slowniki.rodzaje.find(r => r.r === rodz) || {}); cel = { rodz: rodz, poz: sl.p || '', suma: 0, zwroty: 0, tx: [] }; G.push(cel); }
+    cel.tx.unshift(t); cel.suma = Math.round((cel.suma + t.k) * 100) / 100; delete zr.paragony; delete cel.paragony;
+    dane.Z.grupy = G.filter(g => g.tx.length).sort((a, b) => b.suma - a.suma);
+  }
+  function zapiszPoprawke(id) {
+    const rodz = $('#prR').value, czego = $('#prC').value, zawsze = $('#prZ').checked;
+    przeniesLokalnie(id, rodz, czego); zamknijWszystkie(); rysuj(); toast(zawsze ? 'Zapisuję i robię regułę…' : 'Zapisane');
+    wTleZapis('popraw', { id: id, rodzaj: rodz, czego: czego, zawsze: zawsze }, w => { if (zawsze && w.komunikat) stan(w.komunikat); });
+  }
+  function zapiszPoziom(rodz, poz) {
+    dane.Z.grupy.forEach(g => { if (g.rodz === rodz) g.poz = poz; }); zamknijWszystkie(); rysuj(); toast('Poziom: ' + poz);
+    wTleZapis('poziom', { rodzaj: rodz, poziom: poz });
   }
   function oknoX(k) {
     const X = dane.X, G = k[0] === 's' ? (X.stale || { grupy: [] }) : (X.okazjonalne || X), g = G.grupy[+k.slice(1)];
@@ -255,6 +270,25 @@
       : y.platnosci.length ? '<div class="sec"><span>Rozliczone płatnością z banku</span></div>' + lista(y.platnosci).replace('margin-top:12px', '')
       : `<div class="field"><span class="s">Termin</span><span>${esc(y.termin || '—')}</span></div><div class="field"><span class="s">Kwota zwykle</span><span class="num">${zl(y.kwota)}</span></div><div class="field"><span class="s">Co ile</span><span>${esc(y.okres)}</span></div>`;
     okno(y.nazwa, y.zaplacono > 0 ? y.zaplacono : y.kwota, (y.naKoncieRat ? 'przelane na konto do rat' : y.zaplacono > 0 ? 'zapłacone' : 'niezapłacone') + ' · ' + krotko(y.rodz), srodek);
+  }
+
+  // ---------- stan zmiennych (15.10, zamiast koła): jedno zdanie – w planie / na granicy / ponad plan ----------
+  // Budżet na zmienne = z planu miesiąca (wpływy − stałe − oszczędności − jednorazowe); bez planu – średnia z 12 miesięcy.
+  // „Na granicy”: przy tym tempie wydawania do końca okresu zabraknie ponad 5%. „Ponad plan”: już wydane więcej niż budżet.
+  function stanZmiennych(d) {
+    const o = d.okres, Z = d.Z, p = d.plan && d.plan.biezacy, budzet = p ? p.Z : Z.srednia12;
+    const tempo = o.dzien ? Z.suma / o.dzien * o.dni : 0, zostalo = budzet - Z.suma, dni = Math.max(1, o.dni - o.dzien + 1);
+    const st = Z.suma > budzet ? ['Ponad plan', 'zle'] : tempo > budzet * 1.05 ? ['Na granicy', 'uwaga'] : ['W planie', 'ok'];
+    return { budzet: budzet, zostalo: zostalo, dziennie: zostalo / dni, tempo: tempo, st: st, zPlanu: !!p };
+  }
+  function kartaStanu(d) {
+    const s = stanZmiennych(d), o = d.okres, f = s.budzet > 0 ? Math.min(d.Z.suma / s.budzet, 1) : 1, t = o.dzien / o.dni;
+    return `<div class="stan ${s.st[1]} tap" data-plan="1" role="button" tabindex="0">
+      <div class="stan-g"><span class="stan-chip">${s.st[0]}</span><span class="l">na zmienne do ${esc(o.do)}</span></div>
+      <div class="v num">${s.zostalo >= 0 ? 'Zostało ' + zl(s.zostalo) : 'Ponad plan o ' + zl(-s.zostalo)}</div>
+      <div class="bar" aria-hidden="true"><span style="width:${(f * 100).toFixed(1)}%"></span><i style="left:${(t * 100).toFixed(1)}%"></i></div>
+      <div class="l num">wydane ${zl(d.Z.suma)} z ${zl(s.budzet)}${s.zostalo > 0 ? ' · ok. ' + zl(s.dziennie) + ' na dzień' : ''}</div>
+      <div class="stan-d"><span class="l">${s.zPlanu ? 'budżet z planu miesiąca' : 'względem średniej z 12 miesięcy'} · w tym tempie ${zl(s.tempo)}</span><span class="stan-plan">Plan miesiąca ›</span></div></div>`;
   }
 
   // ---------- plan miesiąca (15.10): X − Y − A − jednorazowe = Z na zmienne; A i jednorazowe wpisywane tutaj ----------
@@ -361,8 +395,9 @@
     const z = e.target.closest('[data-z]'), y = e.target.closest('[data-y]'), x = e.target.closest('[data-x]');
     const b = e.target.closest('[data-blok]'), sl = e.target.closest('[data-saldo]'), od = e.target.closest('[data-odhacz]');
     const pl = e.target.closest('[data-plan]'), pm = e.target.closest('[data-pm]'), pu = e.target.closest('[data-pj-usun]');
-    const tx = e.target.closest('[data-tx]'), zt = e.target.closest('[data-zt]'), pz = e.target.closest('[data-poz]');
-    if (tx) { const id = tx.dataset.tx; otworz(() => oknoPoprawki(id)); }
+    const tx = e.target.closest('[data-tx]'), zt = e.target.closest('[data-zt]'), pz = e.target.closest('[data-poz]'), cf = e.target.closest('[data-cofnij]');
+    if (cf) { const i = dane.zadania.findIndex(z => z.klucz === cf.dataset.cofnij); $('#toast').innerHTML = ''; if (i >= 0) odhaczCofnij(i); }
+    else if (tx) { const id = tx.dataset.tx; otworz(() => oknoPoprawki(id)); }
     else if (zt) { zakladkaZ = zt.dataset.zt; oknoZ(+zt.dataset.zi); }
     else if (pz) { if (!pz.classList.contains('on')) { pz.parentNode.querySelectorAll('button').forEach(x => x.disabled = true); zapiszPoziom(pz.dataset.rodz, pz.dataset.poz); } }
     else if (e.target.id === 'prZapisz') zapiszPoprawke(e.target.dataset.id);
