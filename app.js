@@ -1,4 +1,4 @@
-// Nasz budżet – v14 (15.10: plan miesiąca – X / Y / A / jednorazowe / Z, „ile MUSIMY”, zapis z telefonu; v13 14.10: najem na czysto – koszty mieszkania odjęte od najmu, nie ma ich w „Stałe”; v12: kwoty z groszami; v11: rata pokryta saldem konta do rat = zapłacona; v10: przepustka na 30 dni – logowanie raz na miesiąc; v9: aplikacja = podsumowanie; jeden blok „Stałe”, szczegóły płatności: tytuł i konto): ekran „Ten miesiąc” – salda na górze, bloki zwinięte, stałe: do zapłacenia / schodzą same,
+// Nasz budżet – v15 (15.10 popołudnie: poprawki rodzaju / „czego dotyczy” / poziomu z telefonu, „Z paragonów”; v14 15.10: plan miesiąca – X / Y / A / jednorazowe / Z, „ile MUSIMY”, zapis z telefonu; v13 14.10: najem na czysto – koszty mieszkania odjęte od najmu, nie ma ich w „Stałe”; v12: kwoty z groszami; v11: rata pokryta saldem konta do rat = zapłacona; v10: przepustka na 30 dni – logowanie raz na miesiąc; v9: aplikacja = podsumowanie; jeden blok „Stałe”, szczegóły płatności: tytuł i konto): ekran „Ten miesiąc” – salda na górze, bloki zwinięte, stałe: do zapłacenia / schodzą same,
 // wpływy: stałe / okazjonalne (zwroty nie są wpływem – zmniejszają wydatek w swoim rodzaju).
 // Dane trzymamy wyłącznie w pamięci strony – po zamknięciu znikają. W telefonie zapisujemy TYLKO przepustkę od bramy
 // (losowy klucz, ważny 30 dni, bez żadnych danych; „Wyloguj” ją kasuje także w bramie).
@@ -7,7 +7,7 @@
   'use strict';
   const CFG = window.NB_CONFIG;
   let bilet = null, przepustka = null, dane = null, czekanie = null, googleGotowe = false;
-  const WERSJA = 14;
+  const WERSJA = 15;
   const KLUCZ_PRZEPUSTKI = 'nb_przepustka';
   const otwarte = {};                                   // wszystkie bloki zwinięte na start (G 14.10)
   const wToku = {};                                     // odhaczenia wysłane do bramy, jeszcze bez odpowiedzi: klucz → docelowy stan                                   // które bloki rozwinięte (tylko w pamięci, do zamknięcia aplikacji)
@@ -185,7 +185,7 @@
   }
 
   function lista(tx) {
-    return '<div class="list" style="margin-top:12px">' + tx.map(p => `<div class="row"><div class="main"><div class="t">${esc(p.kontr)}</div>${p.tyt ? `<div class="s">${esc(p.tyt)}</div>` : ''}<div class="s">${esc(p.d)}${p.konto ? ' · z konta: ' + esc(p.konto) : ''}</div></div><span class="num">${zl(p.k)}</span></div>`).join('') + '</div>';
+    return '<div class="list" style="margin-top:12px">' + tx.map(p => `<div class="row${p.id ? ' tap' : ''}"${p.id ? ` data-tx="${esc(p.id)}" role="button" tabindex="0"` : ''}><div class="main"><div class="t">${esc(p.kontr)}</div>${p.tyt ? `<div class="s">${esc(p.tyt)}</div>` : ''}<div class="s">${esc(p.d)}${p.konto ? ' · z konta: ' + esc(p.konto) : ''}</div></div><span class="num">${zl(p.k)}</span></div>`).join('') + '</div>';
   }
   function okno(tytul, kwota, pod, srodek) {
     $('#sheet').innerHTML = `<div class="sheet-bg" id="bg"><div class="sheet" role="dialog" aria-label="${esc(tytul)}">
@@ -195,7 +195,50 @@
       <button class="b-ghost big" id="zamknij" type="button">Zamknij</button></div></div>`;
     bindSheet();
   }
-  function oknoZ(i) { const g = dane.Z.grupy[i]; okno(krotko(g.rodz), g.suma, g.rodz.split(' / ')[0] + ' · ' + (g.poz || 'bez poziomu') + (g.zwroty > 0 ? ' · po odjęciu zwrotów (' + zl(g.zwroty) + ')' : ''), lista(g.tx)); }
+  // Rodzaj w zmiennych: płatności (stuknięcie → poprawka), poziom rodzaju, przy paragonach druga zakładka „Z paragonów”.
+  let zakladkaZ = 'tx';
+  function oknoZ(i) {
+    const g = dane.Z.grupy[i], P = g.paragony;
+    const pozRow = `<div class="sec"><span>Poziom rodzaju</span></div><div class="seg poz">${Object.keys(POZ).map(p => `<button type="button" data-poz="${esc(p)}" data-rodz="${esc(g.rodz)}" class="${g.poz === p ? 'on' : ''}" aria-pressed="${g.poz === p}">${esc(p)}</button>`).join('')}</div>`;
+    const tabs = P ? `<div class="seg" role="tablist" style="margin-top:14px"><button type="button" data-zt="tx" data-zi="${i}" class="${zakladkaZ === 'tx' ? 'on' : ''}">Płatności</button><button type="button" data-zt="par" data-zi="${i}" class="${zakladkaZ === 'par' ? 'on' : ''}">Z paragonów</button></div>` : '';
+    const par = P && zakladkaZ === 'par' ? '<div class="list" style="margin-top:12px">' + P.kategorie.map(k => `<div class="row"><div class="main"><div class="t">${esc(k.nazwa)}</div></div><span class="num">${zl(k.suma)}</span></div>`).join('') +
+      (P.bezParagonu > 0 ? `<div class="row"><div class="main"><div class="t">Bez paragonu</div><div class="s">płatności, do których nie ma paragonu</div></div><span class="num">${zl(P.bezParagonu)}</span></div>` : '') + '</div>' : '';
+    okno(krotko(g.rodz), g.suma, g.rodz.split(' / ')[0] + (g.zwroty > 0 ? ' · po odjęciu zwrotów (' + zl(g.zwroty) + ')' : '') + (P ? ' · z paragonów ' + zl(P.zParagonow) : ''),
+      pozRow + tabs + (par || lista(g.tx)));
+  }
+  // ---------- poprawka płatności (15.10): rodzaj, „czego dotyczy”, „Zawsze tak” = reguła ----------
+  function znajdzTx(id) {
+    const szukaj = (L, kier) => { for (const t of L || []) if (String(t.id) === id) return Object.assign({ kier: kier }, t); return null; };
+    for (const g of dane.Z.grupy) { const t = szukaj(g.tx, 'wydatek'); if (t) return t; }
+    for (const y of dane.Y.pozycje) { const t = szukaj(y.platnosci, 'wydatek'); if (t) return t; }
+    for (const g of [].concat((dane.X.stale || {}).grupy || [], (dane.X.okazjonalne || {}).grupy || [], dane.X.grupy || [])) { const t = szukaj(g.tx, 'wpływ'); if (t) return t; const k = szukaj(g.koszty, 'wydatek'); if (k) return k; }
+    return null;
+  }
+  function oknoPoprawki(id) {
+    const t = znajdzTx(id), S = dane.slowniki; if (!t || !S) return okno('Płatność', 0, 'Nie znalazłem tej płatności – odśwież.', '');
+    const grupy = {}; S.rodzaje.filter(r => !r.k || r.k === t.kier || r.r === t.rodz).forEach(r => { const g = r.r.split(' / ')[0]; (grupy[g] = grupy[g] || []).push(r.r); });
+    const opcjeR = Object.keys(grupy).map(g => `<optgroup label="${esc(g)}">${grupy[g].map(r => `<option value="${esc(r)}"${r === t.rodz ? ' selected' : ''}>${esc(krotko(r))}</option>`).join('')}</optgroup>`).join('');
+    const opcjeC = '<option value="">— nic —</option>' + S.czego.map(c => `<option${c === t.czego ? ' selected' : ''}>${esc(c)}</option>`).join('');
+    okno(t.kontr, t.k, t.d + (t.konto ? ' · z konta: ' + t.konto : ''), `${t.tyt ? `<div class="field"><span class="s">Opis</span><span style="text-align:right">${esc(t.tyt)}</span></div>` : ''}
+      <div class="sec"><span>Rodzaj</span></div><div class="list"><label class="row"><select id="prR" aria-label="Rodzaj">${opcjeR}</select></label></div>
+      <div class="sec"><span>Czego dotyczy</span></div><div class="list"><label class="row"><select id="prC" aria-label="Czego dotyczy">${opcjeC}</select></label></div>
+      <div class="list" style="margin-top:12px"><label class="row"><div class="main"><div class="t">Zawsze tak</div><div class="s">dla wszystkich płatności tego sprzedawcy</div></div><input type="checkbox" id="prZ" class="tog"></label></div>
+      <button class="b-soft big" id="prZapisz" type="button" data-id="${esc(id)}">Zapisz</button>`);
+  }
+  function zamknijWszystkie() { stos.length = 0; $('#sheet').innerHTML = ''; }
+  async function zapiszPoprawke(id) {
+    const b = $('#prZapisz'); b.disabled = true; b.textContent = $('#prZ').checked ? 'Zapisuję i przeliczam…' : 'Zapisuję…';
+    let w = null;
+    try { w = await api('popraw', { id: id, rodzaj: $('#prR').value, czego: $('#prC').value, zawsze: $('#prZ').checked }); } catch (e) {}
+    if (w && w.ok) { dane = w; zamknijWszystkie(); rysuj(); toast(w.komunikat && w.komunikat.length < 90 ? w.komunikat : 'Zapisane'); if (w.komunikat && w.komunikat.length >= 90) stan(w.komunikat); }
+    else { b.disabled = false; b.textContent = 'Zapisz'; toast(w ? 'Nie udało się: ' + (w.blad || 'błąd') : 'Brak połączenia – nie zapisano'); }
+  }
+  async function zapiszPoziom(rodz, poz) {
+    let w = null;
+    try { w = await api('poziom', { rodzaj: rodz, poziom: poz }); } catch (e) {}
+    if (w && w.ok) { dane = w; zamknijWszystkie(); rysuj(); toast('Poziom: ' + poz); }
+    else toast(w ? 'Nie udało się: ' + (w.blad || 'błąd') : 'Brak połączenia – nie zapisano');
+  }
   function oknoX(k) {
     const X = dane.X, G = k[0] === 's' ? (X.stale || { grupy: [] }) : (X.okazjonalne || X), g = G.grupy[+k.slice(1)];
     if (g.naCzysto) {                                     // najem: przelew najemcy − koszty mieszkania, które zwraca
@@ -318,7 +361,12 @@
     const z = e.target.closest('[data-z]'), y = e.target.closest('[data-y]'), x = e.target.closest('[data-x]');
     const b = e.target.closest('[data-blok]'), sl = e.target.closest('[data-saldo]'), od = e.target.closest('[data-odhacz]');
     const pl = e.target.closest('[data-plan]'), pm = e.target.closest('[data-pm]'), pu = e.target.closest('[data-pj-usun]');
-    if (pl) { plan = null; otworz(() => oknoPlanu()); }
+    const tx = e.target.closest('[data-tx]'), zt = e.target.closest('[data-zt]'), pz = e.target.closest('[data-poz]');
+    if (tx) { const id = tx.dataset.tx; otworz(() => oknoPoprawki(id)); }
+    else if (zt) { zakladkaZ = zt.dataset.zt; oknoZ(+zt.dataset.zi); }
+    else if (pz) { if (!pz.classList.contains('on')) { pz.parentNode.querySelectorAll('button').forEach(x => x.disabled = true); zapiszPoziom(pz.dataset.rodz, pz.dataset.poz); } }
+    else if (e.target.id === 'prZapisz') zapiszPoprawke(e.target.dataset.id);
+    else if (pl) { plan = null; otworz(() => oknoPlanu()); }
     else if (pm) { if (pm.dataset.pm !== plan.m) { if (plan.zmienione && !confirmPlan()) return; planStart(pm.dataset.pm); oknoPlanu(); } }
     else if (pu) { plan.J.splice(+pu.dataset.pjUsun, 1); plan.zmienione = true; oknoPlanu(); }
     else if (e.target.id === 'pjDodaj') {
@@ -331,13 +379,13 @@
     else if (od) odhacz(+od.dataset.odhacz);
     else if (b) { otwarte[b.dataset.blok] = !otwarte[b.dataset.blok]; rysuj(); }
     else if (sl) otworz(() => oknoSald());
-    else if (z) { const n = +z.dataset.z; otworz(() => oknoZ(n)); }
+    else if (z) { const n = +z.dataset.z; zakladkaZ = 'tx'; otworz(() => oknoZ(n)); }
     else if (y) { const n = +y.dataset.y; otworz(() => oknoY(n)); }
     else if (x) { const n = x.dataset.x; otworz(() => oknoX(n)); }
     else if (e.target.id === 'odswiez') { e.target.disabled = true; e.target.textContent = 'Liczę…'; wczytaj(true).then(() => dane && toast('Odświeżone')); }
     else if (e.target.id === 'wyloguj') wyloguj();
   });
-  document.addEventListener('keydown', e => { const r = e.target.closest('[data-z],[data-y],[data-x],[data-blok],[data-saldo],[data-plan]'); if (r && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); r.click(); } });
+  document.addEventListener('keydown', e => { const r = e.target.closest('[data-z],[data-y],[data-x],[data-blok],[data-saldo],[data-plan],[data-tx]'); if (r && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); r.click(); } });
 
   function tryb() {
     const app = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
