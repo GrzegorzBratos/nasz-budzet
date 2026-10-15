@@ -159,3 +159,5 @@ body { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 84px); }
 .stan .v { font-size: clamp(24px, 8vw, 30px); line-height: 1.15; }
 .stan .l.num, .stan .stan-d .l { white-space: normal; overflow-wrap: anywhere; }
 .stan-chip { white-space: nowrap; }
+/* 15.10 (v20): ograniczenia po rodzajach */
+.bar.maly { height: 6px; margin: 6px 0 2px; } .bar.maly span { background: var(--accent); } .bar.maly.ponad span { background: var(--rose-ink); }
